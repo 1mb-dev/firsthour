@@ -1,3 +1,9 @@
+import pkg from '../package.json' with { type: 'json' };
+import { buildPosts, type PostsBody } from './posts.ts';
+import { ADAPTERS } from './sources/index.ts';
+
+export const USER_AGENT = `firsthour/${pkg.version} (+https://github.com/1mb-dev/firsthour)`;
+
 export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'content-security-policy':
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
@@ -11,10 +17,27 @@ export function withSecurityHeaders(response: Response): Response {
   return secured;
 }
 
+export type PostsLoader = (env: Env, ctx: ExecutionContext) => Promise<PostsBody>;
+
+export function json(body: unknown, status = 200): Response {
+  return Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
+}
+
+/** Routing shared by the production Worker and the fixture-backed mock (`make mock`). */
+export async function route(request: Request, env: Env, ctx: ExecutionContext, loadPosts: PostsLoader): Promise<Response> {
+  const { pathname } = new URL(request.url);
+  if (pathname === '/health') return withSecurityHeaders(new Response('ok'));
+  if (pathname === '/api/posts') {
+    if (request.method !== 'GET') return withSecurityHeaders(new Response('method not allowed', { status: 405, headers: { allow: 'GET' } }));
+    return withSecurityHeaders(json(await loadPosts(env, ctx)));
+  }
+  return withSecurityHeaders(await env.ASSETS.fetch(request));
+}
+
+// Phase 3 wraps this in the fresh/last-good cache.
+const livePosts: PostsLoader = (env) =>
+  buildPosts(ADAPTERS, { fetch: (input, init) => fetch(input, init), now: new Date(), userAgent: USER_AGENT, kv: env.BOARDS });
+
 export default {
-  async fetch(request, env): Promise<Response> {
-    const { pathname } = new URL(request.url);
-    if (pathname === '/health') return withSecurityHeaders(new Response('ok'));
-    return withSecurityHeaders(await env.ASSETS.fetch(request));
-  },
+  fetch: (request, env, ctx) => route(request, env, ctx, livePosts),
 } satisfies ExportedHandler<Env>;
