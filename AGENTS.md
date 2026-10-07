@@ -26,7 +26,7 @@ make fixtures    # Re-record sanitized fixtures from live sources (manual only)
 - Bodies feed classification only. They never reach the browser or KV.
 - Selection is deterministic and takes `now` as a parameter. Tests use the fixture clock, never wall time.
 - CI never calls live sources. `scripts/probe.mjs` is manual.
-- Fixtures are public: strip authors, usernames and emails before committing.
+- Fixtures are public and synthetic: record only through `make fixtures` (anonymized); `test/fixtures.test.ts` guards them.
 
 ## Commits
 

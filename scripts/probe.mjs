@@ -4,20 +4,18 @@
 //   node scripts/probe.mjs fixtures      record sanitized fixtures into test/fixtures/
 //   node scripts/probe.mjs <base-url>    check /api/posts on a running Worker
 //
-// Fixtures are committed to a public repo: authors, usernames and emails are removed, and reply
-// text (written by individuals, not companies) is replaced.
+// Fixtures are committed to a public repo, so everything recorded goes through anonymize.mjs:
+// real shapes, synthetic content. test/fixtures.test.ts fails on anything that slips through.
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { apiUrl } from '../src/boards/ats.ts';
 import { discover } from '../src/boards/discover.ts';
 import { commentsUrl, pickThreads, THREADS_URL, topLevelComments } from '../src/sources/hn.ts';
 import { JOBS_URL } from '../src/sources/yc.ts';
+import { createAnonymizer } from './anonymize.mjs';
 
 const UA = 'firsthour-probe (+https://github.com/1mb-dev/firsthour)';
 const OUT = new URL('../test/fixtures/', import.meta.url);
-const EMAIL = /[\w.+-]+(?:@|&#x40;|\s?\[at\]\s?|\s?\(at\)\s?)[\w-]+(?:\.[\w-]+)+/gi;
-// Spelled-out addresses: "name at company dot com", "jobs [at] acme [dot] io".
-const SPELLED_EMAIL = /[\w.+-]+\s*(?:\[at\]|\(at\)|\bat\b)\s*[\w-]+(?:\s*(?:\[dot\]|\(dot\)|\bdot\b)\s*[\w-]+)+/gi;
 
 async function getJson(url) {
   const response = await fetch(url, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(15_000) });
@@ -25,8 +23,7 @@ async function getJson(url) {
   return response.json();
 }
 
-const scrub = (s) => (typeof s === 'string' ? s.replace(EMAIL, '[email]').replace(SPELLED_EMAIL, '[email]') : s);
-const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => k in obj).map((k) => [k, scrub(obj[k])]));
+const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => k in obj).map((k) => [k, obj[k]]));
 
 async function save(name, data) {
   await writeFile(new URL(name, OUT), JSON.stringify(data, null, 2) + '\n');
@@ -36,6 +33,7 @@ async function save(name, data) {
 async function recordFixtures() {
   await mkdir(OUT, { recursive: true });
   const recordedAt = new Date().toISOString();
+  const anon = createAnonymizer();
 
   const threadsJson = await getJson(THREADS_URL);
   await save('hn-threads.json', { hits: threadsJson.hits.map((h) => pick(h, ['objectID', 'title', 'created_at'])) });
@@ -55,13 +53,15 @@ async function recordFixtures() {
     hits: [
       ...commentsJson.hits
         .filter((h) => keep.has(h.objectID))
-        .map((h) => pick(h, ['objectID', 'parent_id', 'created_at', 'comment_text'])),
+        .map((h) => ({ ...pick(h, ['objectID', 'parent_id', 'created_at']), comment_text: anon.comment(h.comment_text ?? '') })),
       ...replies.map((h) => ({ ...pick(h, ['objectID', 'parent_id', 'created_at']), comment_text: 'Reply text removed.' })),
     ],
   });
 
   const jobsJson = await getJson(JOBS_URL);
-  await save('yc-jobs.json', { hits: jobsJson.hits.map((h) => pick(h, ['objectID', 'title', 'created_at', 'story_text'])) });
+  await save('yc-jobs.json', {
+    hits: jobsJson.hits.map((h) => ({ ...pick(h, ['objectID', 'created_at']), title: anon.ycTitle(h.title ?? ''), ...(h.story_text ? { story_text: '' } : {}) })),
+  });
 
   // One board per platform: the first that answers with jobs.
   const boards = discover(topLevelComments(commentsJson, thread.id));
@@ -74,9 +74,9 @@ async function recordFixtures() {
       const trimmed = jobs.slice(0, 8).map((j) =>
         pick(j, ['id', 'title', 'text', 'location', 'categories', 'publishedAt', 'first_published', 'createdAt', 'isListed', 'isRemote', 'workplaceType', 'descriptionPlain']),
       );
-      for (const j of trimmed) if (typeof j.descriptionPlain === 'string') j.descriptionPlain = j.descriptionPlain.slice(0, 400);
-      await save(`${platform}.json`, Array.isArray(json) ? trimmed : { jobs: trimmed });
-      chosen.push(board);
+      const safe = anon.boardJobs(trimmed, board);
+      await save(`${platform}.json`, Array.isArray(json) ? safe : { jobs: safe });
+      chosen.push(anon.board(board));
       break;
     }
   }

@@ -6,4 +6,6 @@
 4. Run `make check` (lint + tests) and fix any issues.
 5. Open a pull request.
 
-Tests run against sanitized fixtures in `test/fixtures/`; CI never calls live sources. If a source changes shape, re-record with `make fixtures` and check the diff for authors, usernames or emails before committing.
+Tests run against fixtures in `test/fixtures/`; CI never calls live sources. If a source changes shape, re-record with `make fixtures`: `scripts/anonymize.mjs` keeps the real response shapes and replaces the content, and `test/fixtures.test.ts` fails on any real link, slug or email that gets through.
+
+Report security issues through GitHub Security Advisories, not public issues (1mb-dev policy).

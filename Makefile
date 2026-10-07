@@ -30,7 +30,7 @@ audit:              ## Dependency audit (production only)
 	npm run audit:deps
 
 # Live sources (manual only; CI never calls them)
-fixtures:           ## Re-record sanitized fixtures from live sources
+fixtures:           ## Re-record anonymized fixtures from live sources
 	node scripts/probe.mjs fixtures
 
 clean:              ## Remove local Worker state
