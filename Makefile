@@ -1,8 +1,11 @@
-.PHONY: dev install lint test test-watch check types fixtures audit clean help setup
+.PHONY: dev mock install lint test test-watch check types fixtures audit clean help setup
 
 # Development
 dev:                ## Start the Worker locally (wrangler dev)
 	npm run dev
+
+mock:               ## Start the Worker on fixture data; /__mock/<state> switches state
+	npm run mock
 
 install:            ## Install dependencies
 	npm ci

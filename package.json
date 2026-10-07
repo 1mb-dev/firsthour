@@ -12,6 +12,7 @@
   },
   "scripts": {
     "dev": "wrangler dev",
+    "mock": "wrangler dev -c wrangler.mock.jsonc",
     "types": "wrangler types",
     "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.public.json",
     "test": "vitest run",
