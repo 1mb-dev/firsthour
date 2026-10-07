@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-10-07T17:38:55.505Z",
+  "thread": {
+    "id": "49922569",
+    "title": "Ask HN: Who is hiring? (October 2026)",
+    "created_at": "2026-10-01T15:02:07Z"
+  },
+  "boards": [
+    {
+      "platform": "ashby",
+      "slug": "company1",
+      "company": "Company1"
+    },
+    {
+      "platform": "greenhouse",
+      "slug": "company2",
+      "company": "Company4"
+    },
+    {
+      "platform": "lever",
+      "slug": "company16",
+      "company": "Company35"
+    }
+  ]
+}
