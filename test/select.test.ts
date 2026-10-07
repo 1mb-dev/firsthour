@@ -62,6 +62,7 @@ describe('deny list', () => {
     const titles = [
       'Ledgerly | Backend Engineer, unpaid invoices team | REMOTE',
       'Riskco | Exposure Management Engineer | REMOTE',
+      'Secco | Security Engineer, tooling for exposure management | REMOTE',
       'Acme | Engineer | REMOTE | salary plus equity',
       'Acme | Engineer | REMOTE | we volunteer at local schools',
     ];
@@ -77,7 +78,7 @@ describe('remote gate', () => {
     },
   );
 
-  it.each(['not remote', 'No remote', 'ONSITE ONLY', 'on-site only'])('a "%s" phrase overrides', (phrase) => {
+  it.each(['not remote', 'No remote', 'non-remote', 'Non remote', 'ONSITE ONLY', 'on-site only'])('a "%s" phrase overrides', (phrase) => {
     expect(textRemote(`Acme | Engineer | Remote team, but ${phrase}`)).toBe(false);
   });
 

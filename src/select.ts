@@ -11,7 +11,10 @@ const SHAPE_PREFIX = 200;
 const BODY_REMOTE_WINDOW = 500;
 
 const REMOTE_TERMS = ['remote', 'remotely', 'wfh', 'work from home', 'anywhere', 'fully distributed', 'distributed team'];
-const NOT_REMOTE_TERMS = ['not remote', 'no remote', 'onsite only', 'on-site only'];
+const NOT_REMOTE_TERMS = ['not remote', 'no remote', 'non-remote', 'non remote', 'onsite only', 'on-site only'];
+
+/** Separators between the fields of an HN posting header. */
+export const SEPARATOR = /\||\u2014| - /;
 
 function phraseMatcher(phrases: readonly string[]): (text: string) => boolean {
   const escaped = phrases.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
@@ -29,7 +32,7 @@ export function textRemote(text: string): boolean {
 
 /** HN posting shape: a header like `Acme | Backend Engineer | REMOTE`, not an applicant's reply. */
 export function isPostingShape(line: string): boolean {
-  return line.slice(0, SHAPE_PREFIX).split(/\||\u2014| - /).filter((s) => s.trim()).length >= 2;
+  return line.slice(0, SHAPE_PREFIX).split(SEPARATOR).filter((s) => s.trim()).length >= 2;
 }
 
 export function isDenied(c: Candidate): boolean {

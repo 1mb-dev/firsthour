@@ -1,5 +1,5 @@
 // Phrases, never bare words: bare "unpaid" drops fintech roles about unpaid invoices, bare
-// "exposure" drops risk and security roles. Each entry has a test in test/select.test.ts.
+// "exposure" (even "for exposure") drops risk and security roles. Each entry has a test in test/select.test.ts.
 export const DENY_PHRASES: readonly string[] = [
   'unpaid position',
   'unpaid role',
@@ -10,7 +10,8 @@ export const DENY_PHRASES: readonly string[] = [
   'volunteer role',
   'volunteer basis',
   'volunteer opportunity',
-  'for exposure',
+  'work for exposure',
+  'in exchange for exposure',
   'paid in exposure',
   'equity only',
   'equity-only',
