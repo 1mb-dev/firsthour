@@ -12,7 +12,7 @@ import type { Board } from '../../src/boards/discover.ts';
 import { buildSnapshot, SNAPSHOT_KEY } from '../../src/boards/snapshot.ts';
 import { buildPosts, type PostsBody } from '../../src/posts.ts';
 import { ADAPTERS } from '../../src/sources/index.ts';
-import { route, USER_AGENT, withSecurityHeaders } from '../../src/worker.ts';
+import { route, USER_AGENT, withSecurityHeaders } from '../../src/app.ts';
 
 const STATES = ['success', 'empty', 'partial', 'stale', 'down', 'error'] as const;
 type State = (typeof STATES)[number];

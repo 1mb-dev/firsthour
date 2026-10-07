@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import worker, { route, SECURITY_HEADERS } from '../src/worker.ts';
+import { route, SECURITY_HEADERS } from '../src/app.ts';
+import * as entry from '../src/worker.ts';
 import type { PostsBody } from '../src/posts.ts';
+
+const worker = entry.default;
 
 const env = {
   ASSETS: { fetch: async () => new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } }) },
@@ -9,6 +12,10 @@ const env = {
 const ctx = {} as ExecutionContext;
 
 describe('worker', () => {
+  it('exports only the default handler: workerd rejects other named exports as entrypoints', () => {
+    expect(Object.keys(entry)).toEqual(['default']);
+  });
+
   it('answers /health with ok and security headers', async () => {
     const res = await worker.fetch(new Request('https://firsthour.1mb.dev/health') as never, env, ctx);
     expect(await res.text()).toBe('ok');
