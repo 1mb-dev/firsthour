@@ -16,7 +16,7 @@ function fakeFetch(routes: Record<string, unknown>): typeof fetch {
 }
 
 function deps(fetchFn: typeof fetch): Deps {
-  return { fetch: fetchFn, now: NOW, userAgent: 'test' };
+  return { fetch: fetchFn, now: NOW, userAgent: 'test', signal: new AbortController().signal };
 }
 
 describe('hn adapter', () => {
@@ -82,6 +82,30 @@ describe('hn adapter', () => {
 
   it('fails with no thread when none is listed', async () => {
     await expect(hn.load(deps(fakeFetch({ author_whoishiring: { hits: [] } })))).rejects.toMatchObject({ code: 'no thread' });
+  });
+
+  it('reports an aborted fetch as timeout, not network', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const aborting = (async (_: unknown, init?: RequestInit) => {
+      init?.signal?.throwIfAborted();
+      return Response.json({ hits: [] });
+    }) as unknown as typeof fetch;
+    await expect(hn.load({ ...deps(aborting), signal: controller.signal })).rejects.toMatchObject({ code: 'timeout' });
+  });
+
+  it('reports a deadline that fires mid-body as timeout, not parse', async () => {
+    const controller = new AbortController();
+    const stalled = (async () => {
+      const response = Response.json({ hits: [] });
+      // fetch cancels the body read when its signal aborts; the read then rejects with AbortError.
+      response.json = () => {
+        controller.abort();
+        return Promise.reject(new DOMException('aborted', 'AbortError'));
+      };
+      return response;
+    }) as unknown as typeof fetch;
+    await expect(hn.load({ ...deps(stalled), signal: controller.signal })).rejects.toMatchObject({ code: 'timeout' });
   });
 
   it('fails with parse on a non-JSON body', async () => {

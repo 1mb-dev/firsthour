@@ -1,25 +1,22 @@
 import { SourceError } from './types.ts';
 
-export async function fetchJson(
-  fetchFn: typeof fetch,
-  url: string,
-  userAgent: string,
-  timeoutMs: number,
-): Promise<unknown> {
+function isAbort(error: unknown, signal: AbortSignal): boolean {
+  return signal.aborted || (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'));
+}
+
+export async function fetchJson(fetchFn: typeof fetch, url: string, userAgent: string, signal: AbortSignal): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetchFn(url, {
-      headers: { 'user-agent': userAgent, accept: 'application/json' },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    response = await fetchFn(url, { headers: { 'user-agent': userAgent, accept: 'application/json' }, signal });
   } catch (error) {
-    throw new SourceError(error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'network');
+    throw new SourceError(isAbort(error, signal) ? 'timeout' : 'network');
   }
   if (!response.ok) throw new SourceError(String(response.status));
   try {
     return await response.json();
-  } catch {
-    throw new SourceError('parse');
+  } catch (error) {
+    // The deadline can fire mid-body; that is a slow upstream, not a schema problem.
+    throw new SourceError(isAbort(error, signal) ? 'timeout' : 'parse');
   }
 }
 

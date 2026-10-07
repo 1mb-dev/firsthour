@@ -228,6 +228,7 @@ describe('boards source (KV)', () => {
       fetch: (() => Promise.reject(new Error('no network'))) as unknown as typeof fetch,
       now: NOW,
       userAgent: 'test',
+      signal: new AbortController().signal,
       kv: { get: (async (key: string) => (key === SNAPSHOT_KEY ? snapshot : null)) as never },
     };
   }

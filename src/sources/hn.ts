@@ -4,11 +4,12 @@ import { SourceError, type Adapter, type Candidate } from '../types.ts';
 
 const ALGOLIA = 'https://hn.algolia.com/api/v1/search_by_date';
 const THREAD_PREFIX = 'Ask HN: Who is hiring?';
-const TIMEOUT_MS = 5000;
 
 export const THREADS_URL = `${ALGOLIA}?tags=story,author_whoishiring&hitsPerPage=5`;
 
-export function commentsUrl(threadId: string, hitsPerPage = 300): string {
+// Replies count toward hitsPerPage, so anything under Algolia's 1000 max drops the oldest postings,
+// which are the day-one burst.
+export function commentsUrl(threadId: string, hitsPerPage = 1000): string {
   return `${ALGOLIA}?tags=comment,story_${threadId}&hitsPerPage=${hitsPerPage}&attributesToRetrieve=comment_text,created_at,parent_id&attributesToHighlight=none`;
 }
 
@@ -82,10 +83,10 @@ export function toCandidates(comments: Comment[], thread: Thread): Candidate[] {
 
 export const hn: Adapter = {
   id: 'hn',
-  async load({ fetch, userAgent }) {
-    const thread = pickThreads(await fetchJson(fetch, THREADS_URL, userAgent, TIMEOUT_MS))[0];
+  async load({ fetch, userAgent, signal }) {
+    const thread = pickThreads(await fetchJson(fetch, THREADS_URL, userAgent, signal))[0];
     if (!thread) throw new SourceError('no thread');
-    const comments = topLevelComments(await fetchJson(fetch, commentsUrl(thread.id), userAgent, TIMEOUT_MS), thread.id);
+    const comments = topLevelComments(await fetchJson(fetch, commentsUrl(thread.id), userAgent, signal), thread.id);
     return { posts: toCandidates(comments, thread), thread_at: thread.created_at };
   },
 };

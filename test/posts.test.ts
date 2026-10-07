@@ -3,7 +3,7 @@ import { allFailed, buildPosts } from '../src/posts.ts';
 import { SourceError, type Adapter, type Deps, type SourceId } from '../src/types.ts';
 import { candidate, minutesAgo, NOW } from './helpers.ts';
 
-const deps: Deps = { fetch: fetch, now: NOW, userAgent: 'test' };
+const deps: Omit<Deps, 'signal'> = { fetch: fetch, now: NOW, userAgent: 'test' };
 
 function ok(id: SourceId, n: number, extra: Partial<Awaited<ReturnType<Adapter['load']>>> = {}): Adapter {
   return {
@@ -52,6 +52,21 @@ describe('buildPosts', () => {
     const body = await buildPosts([ok('hn', 1), hung], deps, 20);
     expect(body.sources[1]).toMatchObject({ ok: false, error: 'timeout' });
     expect(body.items).toHaveLength(1);
+  });
+
+  it('aborts the fetches of a source that misses the deadline', async () => {
+    let seen: AbortSignal | undefined;
+    const slow: Adapter = {
+      id: 'hn',
+      load: ({ signal }) =>
+        new Promise((_, reject) => {
+          seen = signal;
+          signal.addEventListener('abort', () => reject(new SourceError('timeout')));
+        }),
+    };
+    const body = await buildPosts([slow], deps, 20);
+    expect(seen?.aborted).toBe(true);
+    expect(body.sources[0]?.error).toBe('timeout');
   });
 
   it('reports a non-SourceError as internal, not as a source outage code', async () => {

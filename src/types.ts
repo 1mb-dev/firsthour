@@ -21,6 +21,8 @@ export interface Deps {
   fetch: typeof fetch;
   now: Date;
   userAgent: string;
+  /** One deadline for the whole request; fetches abort on it. */
+  signal: AbortSignal;
   kv?: Pick<KVNamespace, 'get'>;
 }
 

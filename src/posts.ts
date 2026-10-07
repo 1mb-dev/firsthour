@@ -20,12 +20,14 @@ export interface PostsBody {
   items: Item[];
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new SourceError('timeout')), ms);
+/** Rejects when the deadline fires, for work that does not take the signal itself (a KV read). */
+function withDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new SourceError('timeout'));
+    if (signal.aborted) return onAbort();
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function errorCode(error: unknown): string {
@@ -33,10 +35,19 @@ function errorCode(error: unknown): string {
   return error instanceof SourceError ? error.code : 'internal';
 }
 
-/** Loads every source in parallel. One source failing never blocks the others. */
-export async function buildPosts(adapters: readonly Adapter[], deps: Deps, timeoutMs = SOURCE_TIMEOUT_MS): Promise<PostsBody> {
-  const now = deps.now;
-  const settled = await Promise.allSettled(adapters.map((a) => withTimeout(a.load(deps), timeoutMs)));
+/**
+ * Loads every source in parallel under one deadline. One source failing never blocks the others,
+ * and a source that misses the deadline has its fetches aborted, not left running.
+ */
+export async function buildPosts(
+  adapters: readonly Adapter[],
+  base: Omit<Deps, 'signal'>,
+  timeoutMs = SOURCE_TIMEOUT_MS,
+): Promise<PostsBody> {
+  const now = base.now;
+  const signal = AbortSignal.timeout(timeoutMs);
+  const deps: Deps = { ...base, signal };
+  const settled = await Promise.allSettled(adapters.map((a) => withDeadline(a.load(deps), signal)));
 
   const candidates: Candidate[] = [];
   const results: { id: SourceId; loaded?: Loaded; error: string | null }[] = adapters.map((adapter, i) => {

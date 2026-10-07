@@ -29,7 +29,7 @@ export function parseJobs(json: unknown): Candidate[] {
 
 export const yc: Adapter = {
   id: 'yc',
-  async load({ fetch, userAgent }) {
-    return { posts: parseJobs(await fetchJson(fetch, JOBS_URL, userAgent, 5000)) };
+  async load({ fetch, userAgent, signal }) {
+    return { posts: parseJobs(await fetchJson(fetch, JOBS_URL, userAgent, signal)) };
   },
 };
