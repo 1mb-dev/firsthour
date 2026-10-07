@@ -1,4 +1,4 @@
-import { isPostingShape } from '../select.ts';
+import { isPostingShape, SEPARATOR } from '../select.ts';
 import { decodeEntities, firstLine, htmlToText } from '../text.ts';
 import type { Comment } from '../sources/hn.ts';
 
@@ -21,8 +21,9 @@ const SLUG = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 const RESERVED = new Set(['embed']);
 const COMPANY_MAX = 60;
 
+// HN shortens long link labels to "jobs.ashbyhq.com/longcomp...", which would read as a second slug.
 export function isValidSlug(slug: string): boolean {
-  return SLUG.test(slug) && !RESERVED.has(slug);
+  return SLUG.test(slug) && !RESERVED.has(slug) && !slug.includes('..') && !slug.endsWith('.');
 }
 
 /** Board links in one comment's HTML. Algolia encodes `/` as `&#x2F;`, so entities are decoded first. */
@@ -39,7 +40,7 @@ export function extractBoards(html: string): { platform: Platform; slug: string 
 }
 
 function companyOf(line: string): string {
-  const name = line.split(/\||—| - /)[0]?.trim() ?? '';
+  const name = line.split(SEPARATOR)[0]?.trim() ?? '';
   return Array.from(name).slice(0, COMPANY_MAX).join('').trim();
 }
 

@@ -49,7 +49,9 @@ export async function buildSnapshot(
     try {
       return parseBoard(board, await fetchBoard(board));
     } catch (error) {
-      failures.push({ board, error: error instanceof SourceError ? error.code : String(error) });
+      // A non-SourceError is a bug in a parser, not an upstream outage: log it and say so.
+      if (!(error instanceof SourceError)) console.error(`${board.platform}:${board.slug}`, error);
+      failures.push({ board, error: error instanceof SourceError ? error.code : 'internal' });
       return [];
     }
   });

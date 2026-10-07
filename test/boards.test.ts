@@ -30,6 +30,12 @@ describe('discovery', () => {
     expect(extractBoards('https://jobs.ashbyhq.com/Acme%20Inc/1')).toEqual([]);
   });
 
+  it('ignores the shortened link label HN shows next to the real href', () => {
+    const html =
+      '<a href="https:&#x2F;&#x2F;jobs.ashbyhq.com&#x2F;averyveryverylongcompanynamehere&#x2F;x" rel="nofollow">https:&#x2F;&#x2F;jobs.ashbyhq.com&#x2F;averyveryverylongcomp...</a>';
+    expect(extractBoards(html)).toEqual([{ platform: 'ashby', slug: 'averyveryverylongcompanynamehere' }]);
+  });
+
   it('names the company from the newest posting and dedupes boards', () => {
     const comments = [
       { id: '2', created_at: '2026-10-02T00:00:00Z', html: 'Acme AI | Backend | REMOTE<p>https://jobs.ashbyhq.com/acme' },
@@ -176,6 +182,19 @@ describe('snapshot', () => {
 
   it('is not writable with no boards at all', async () => {
     expect((await buildSnapshot([], async () => null, NOW)).writable).toBe(false);
+  });
+
+  it('logs a parser bug and labels it internal instead of passing it off as an outage', async () => {
+    const errors: unknown[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => errors.push(args);
+    try {
+      const run = await buildSnapshot([board('lever')], async () => [null, { get id() { throw new TypeError('bug'); } }], NOW);
+      expect(run.failures[0]?.error).toBe('internal');
+      expect(errors).toHaveLength(1);
+    } finally {
+      console.error = original;
+    }
   });
 
   it('counts a board with a malformed response as failed', async () => {
