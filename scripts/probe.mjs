@@ -63,7 +63,7 @@ async function recordFixtures() {
   const jobsJson = await getJson(JOBS_URL);
   await save('yc-jobs.json', { hits: jobsJson.hits.map((h) => pick(h, ['objectID', 'title', 'created_at', 'story_text'])) });
 
-  // One board per platform, preferring one with a remote role.
+  // One board per platform: the first that answers with jobs.
   const boards = discover(topLevelComments(commentsJson, thread.id));
   const chosen = [];
   for (const platform of ['ashby', 'greenhouse', 'lever']) {

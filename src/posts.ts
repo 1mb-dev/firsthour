@@ -31,7 +31,7 @@ function withDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 function errorCode(error: unknown): string {
-  // Anything that is not a SourceError is a bug in an adapter; the code says so instead of hiding it.
+  // A non-SourceError is an adapter bug, not an outage; label it so.
   return error instanceof SourceError ? error.code : 'internal';
 }
 

@@ -20,10 +20,10 @@ make dev         # Worker on localhost via wrangler dev
 make fixtures    # Re-record sanitized fixtures from live sources (manual only)
 ```
 
-## Rules that hold the design together
+## Invariants
 
 - Every title and body is attacker-controlled. Render with `textContent` only; build links from validated ids (`src/boards/ats.ts`, `src/sources/hn.ts`), never from content.
-- Bodies are for classification only. Nothing outside `select()` sees them; they never reach the browser or KV.
+- Bodies feed classification only. They never reach the browser or KV.
 - Selection is deterministic and takes `now` as a parameter. Tests use the fixture clock, never wall time.
 - CI never calls live sources. `scripts/probe.mjs` is manual.
 - Fixtures are public: strip authors, usernames and emails before committing.
