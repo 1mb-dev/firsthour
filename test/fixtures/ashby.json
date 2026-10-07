@@ -1,0 +1,24 @@
+{
+  "jobs": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "title": "Customer Engineer",
+      "location": "Remote",
+      "publishedAt": "2026-09-02T22:13:40.033+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "descriptionPlain": "Details of the role, the team and how to apply are in the original post."
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "title": "AI Engineer ",
+      "location": "Remote",
+      "publishedAt": "2026-10-07T16:24:59.247+00:00",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "descriptionPlain": "Details of the role, the team and how to apply are in the original post."
+    }
+  ]
+}

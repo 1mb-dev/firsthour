@@ -1,0 +1,82 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000007",
+    "text": "Physician - Virtual Primary Care (Days)",
+    "categories": {
+      "commitment": "W2",
+      "department": "Clinical",
+      "location": "Remote",
+      "team": "Physician",
+      "allLocations": [
+        "Remote"
+      ]
+    },
+    "createdAt": 1789502147439,
+    "workplaceType": "remote",
+    "descriptionPlain": "Details of the role, the team and how to apply are in the original post."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000008",
+    "text": "Physician - Virtual Primary Care (Overnight)",
+    "categories": {
+      "commitment": "W2",
+      "department": "Clinical",
+      "location": "Remote",
+      "team": "Physician",
+      "allLocations": [
+        "Remote"
+      ]
+    },
+    "createdAt": 1783459460750,
+    "workplaceType": "remote",
+    "descriptionPlain": "Details of the role, the team and how to apply are in the original post."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000009",
+    "text": "Senior Software Engineer, Agentic AI",
+    "categories": {
+      "commitment": "W2",
+      "department": "AI",
+      "location": "Remote",
+      "team": "AI/ML Engineering",
+      "allLocations": [
+        "Remote"
+      ]
+    },
+    "createdAt": 1790794199400,
+    "workplaceType": "remote",
+    "descriptionPlain": "Details of the role, the team and how to apply are in the original post."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000010",
+    "text": "Senior Software Engineer, Full-Stack",
+    "categories": {
+      "commitment": "W2",
+      "department": "Engineering",
+      "location": "Remote",
+      "team": "Product Engineering",
+      "allLocations": [
+        "Remote"
+      ]
+    },
+    "createdAt": 1790792281515,
+    "workplaceType": "remote",
+    "descriptionPlain": "Details of the role, the team and how to apply are in the original post."
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000011",
+    "text": "Senior Software Engineer, Marketing Platform",
+    "categories": {
+      "commitment": "W2",
+      "department": "Engineering",
+      "location": "Remote",
+      "team": "Marketing Platform",
+      "allLocations": [
+        "Remote"
+      ]
+    },
+    "createdAt": 1790699363512,
+    "workplaceType": "remote",
+    "descriptionPlain": "Details of the role, the team and how to apply are in the original post."
+  }
+]
