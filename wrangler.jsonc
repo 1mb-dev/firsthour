@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "firsthour",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS",
+    // Every response, static or API, goes through the Worker so security headers live in one place.
+    "run_worker_first": true
+  },
+  "kv_namespaces": [
+    // Placeholder until the namespace is created (Phase 4). `wrangler dev` uses local storage regardless.
+    { "binding": "BOARDS", "id": "firsthour-boards-placeholder" }
+  ],
+  "observability": { "enabled": true }
+}

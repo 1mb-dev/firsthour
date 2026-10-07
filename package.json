@@ -1,0 +1,28 @@
+{
+  "name": "firsthour",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Fresh remote roles from Hacker News and the companies hiring there, while they are still new",
+  "homepage": "https://firsthour.1mb.dev",
+  "repository": "github:1mb-dev/firsthour",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "types": "wrangler types",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run lint && npm run test",
+    "audit:deps": "npm audit --omit=dev || true"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.148.0"
+  }
+}
