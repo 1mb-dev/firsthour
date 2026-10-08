@@ -2,13 +2,14 @@
 // Live source check. Manual only: CI never calls live sources.
 //
 //   node scripts/probe.mjs fixtures      record sanitized fixtures into test/fixtures/
-//   node scripts/probe.mjs <base-url>    check /api/posts on a running Worker
+//   node scripts/probe.mjs <base-url>    check /api/posts on a running Worker, the hn request upstream,
+//                                        and one built job URL per ATS
 //
 // Fixtures are committed to a public repo, so everything recorded goes through anonymize.mjs:
 // real shapes, synthetic content. test/fixtures.test.ts fails on anything that slips through.
 
 import { mkdir, writeFile } from 'node:fs/promises';
-import { apiUrl } from '../src/boards/ats.ts';
+import { apiUrl, parseBoard } from '../src/boards/ats.ts';
 import { discover } from '../src/boards/discover.ts';
 import { commentsUrl, pickThreads, THREADS_URL, topLevelComments } from '../src/sources/hn.ts';
 import { JOBS_URL } from '../src/sources/yc.ts';
@@ -90,7 +91,28 @@ async function checkWorker(base) {
   const body = await response.json();
   console.log(`HTTP ${response.status}  stale=${body.stale}  items=${body.items?.length}  next_thread=${body.next_thread}`);
   for (const s of body.sources ?? []) console.log(`  ${s.id.padEnd(7)} ok=${s.ok} count=${s.count} error=${s.error} fetched_at=${s.fetched_at}`);
-  if (!response.ok || !body.sources?.every((s) => s.ok)) process.exit(1);
+  let failed = !response.ok || !body.sources?.every((s) => s.ok);
+
+  // Replies in the hn response would count toward the 1000-hit cap.
+  const threads = pickThreads(await getJson(THREADS_URL)).slice(0, 3);
+  const pages = await Promise.all(threads.map((t) => getJson(commentsUrl(t.id))));
+  const replies = pages[0].hits.filter((h) => String(h.parent_id) !== threads[0].id).length;
+  console.log(`hn upstream  thread=${threads[0].id}  hits=${pages[0].hits.length}  replies=${replies}`);
+  failed ||= replies > 0;
+
+  // One job URL per ATS, built the way the boards source builds it, must answer 200.
+  const boards = discover(threads.flatMap((t, i) => topLevelComments(pages[i], t.id)));
+  for (const platform of ['ashby', 'greenhouse', 'lever']) {
+    let url;
+    for (const board of boards.filter((b) => b.platform === platform)) {
+      url = await getJson(apiUrl(board)).then((json) => parseBoard(board, json)[0]?.url, () => undefined);
+      if (url) break;
+    }
+    const status = url ? (await fetch(url, { headers: { 'user-agent': UA } })).status : 'no board with jobs';
+    console.log(`${platform.padEnd(11)} ${status}  ${url ?? ''}`);
+    failed ||= status !== 200;
+  }
+  if (failed) process.exit(1);
 }
 
 const arg = process.argv[2];
