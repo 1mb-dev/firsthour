@@ -20,3 +20,7 @@ updates:
       timezone: Asia/Kolkata
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # Types describe the runtime: engines and CI are Node 22, so newer majors would type-check APIs it lacks.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
