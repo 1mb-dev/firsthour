@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { Board } from '../src/boards/discover.ts';
+import { buildSnapshot, SNAPSHOT_KEY } from '../src/boards/snapshot.ts';
 import { cachedPosts, type PostsCache } from '../src/cache.ts';
-import type { PostsBody, SourceStatus } from '../src/posts.ts';
-import { NOW } from './helpers.ts';
+import { buildPosts, type PostsBody, type SourceStatus } from '../src/posts.ts';
+import { BASELINE_KEY, buildBaseline, pickThreads, topLevelComments } from '../src/sources/hn.ts';
+import { ADAPTERS } from '../src/sources/index.ts';
+import type { Deps } from '../src/types.ts';
+import { fixture, META, NOW } from './helpers.ts';
 
 const ORIGIN = 'https://firsthour.1mb.dev';
 
@@ -86,5 +91,56 @@ describe('cachedPosts', () => {
     await serve(cache, body([null, null, null]), 'https://jobs.example.org');
     expect(store.size).toBe(2);
     expect([...store.keys()].every((k) => k.startsWith('https://jobs.example.org/'))).toBe(true);
+  });
+});
+
+describe('the real sources behind the cache', () => {
+  const upstream = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes('author_whoishiring')) return Response.json(fixture('hn-threads.json'));
+    if (url.includes('story_')) return Response.json(fixture('hn-comments.json'));
+    if (url.includes('tags=job')) return Response.json(fixture('yc-jobs.json'));
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+  const outage = (async () => new Response('', { status: 503 })) as unknown as typeof fetch;
+
+  async function snapshots(): Promise<Deps['kv']> {
+    const json: Record<string, unknown> = { ashby: fixture('ashby.json'), greenhouse: fixture('greenhouse.json'), lever: fixture('lever.json') };
+    const boards = await buildSnapshot(META.boards as Board[], async (b) => json[b.platform], NOW);
+    const [thread] = pickThreads(fixture('hn-threads.json'));
+    const values: Record<string, unknown> = {
+      [SNAPSHOT_KEY]: boards.snapshot,
+      [BASELINE_KEY]: buildBaseline(thread!, topLevelComments(fixture('hn-comments.json'), META.thread.id), NOW),
+    };
+    return { get: (async (key: string) => values[key] ?? null) as never };
+  }
+
+  async function serveLive(cache: PostsCache, fetchFn: typeof fetch, kv: Deps['kv']): Promise<PostsBody> {
+    const pending: Promise<unknown>[] = [];
+    const served = await cachedPosts(cache, ORIGIN, () => buildPosts(ADAPTERS, { fetch: fetchFn, now: NOW, userAgent: 'test', kv }), (p) => void pending.push(p));
+    await Promise.all(pending);
+    return served;
+  }
+
+  it('serves last-good marked stale when every source fails', async () => {
+    const { cache, store } = memoryCache();
+    const good = await serveLive(cache, upstream, await snapshots());
+    expect(good.sources.map((s) => s.ok)).toEqual([true, true, true]);
+    expect(good.items.length).toBeGreaterThan(0);
+    store.delete(`${ORIGIN}/__cache/posts/fresh`);
+    const down = await serveLive(cache, outage, undefined);
+    expect(down.stale).toBe(true);
+    expect(down.items).toEqual(good.items);
+    expect(down.sources.map((s) => [s.id, s.error])).toEqual([
+      ['hn', '503'],
+      ['yc', '503'],
+      ['boards', 'no kv'],
+    ]);
+  });
+
+  it('serves the failed build when every source fails and there is no last-good', async () => {
+    const down = await serveLive(memoryCache().cache, outage, undefined);
+    expect(down.stale).toBe(false);
+    expect(down.sources.every((s) => !s.ok)).toBe(true);
   });
 });
