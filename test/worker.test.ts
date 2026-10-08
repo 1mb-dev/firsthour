@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { route, SECURITY_HEADERS } from '../src/app.ts';
 import * as entry from '../src/worker.ts';
 import type { PostsBody } from '../src/posts.ts';
@@ -43,4 +43,36 @@ describe('worker', () => {
     expect(res.status).toBe(405);
     expect(res.headers.get('allow')).toBe('GET');
   });
+
+  describe('scheduled', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    /** Runs the cron handler and returns the promise it hands to waitUntil. */
+    function runScheduled(kv: Pick<KVNamespace, 'get' | 'put'>): Promise<unknown> {
+      let pending: Promise<unknown> = Promise.resolve();
+      const scheduledCtx = { waitUntil: (p: Promise<unknown>) => (pending = p) } as unknown as ExecutionContext;
+      worker.scheduled!({} as ScheduledController, { ...env, SNAPSHOTS: kv } as unknown as Env, scheduledCtx);
+      return pending;
+    }
+
+    const emptyKv = { get: async () => null, put: async () => {} } as unknown as Pick<KVNamespace, 'get' | 'put'>;
+
+    it('fails the cron run when a snapshot cannot be refreshed', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.stubGlobal('fetch', async () => new Response('not found', { status: 404 }));
+      await expect(runScheduled(emptyKv)).rejects.toThrow('snapshot refresh failed: boards:latest, hn:latest');
+    });
+
+    it('succeeds when both snapshots refresh', async () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      const now = new Date().toISOString();
+      const body = (url: string) => (url.includes('/hn.json') ? { generated: now, thread_id: '1', thread_at: now, watermark: now, items: [] } : { generated: now, items: [] });
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL) => Response.json(body(String(input))));
+      await expect(runScheduled(emptyKv)).resolves.toBeUndefined();
+    });
+  });
 });
+

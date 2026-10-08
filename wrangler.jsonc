@@ -13,5 +13,7 @@
     // Placeholder until the namespace is created (Phase 4). `wrangler dev` uses local storage regardless.
     { "binding": "SNAPSHOTS", "id": "firsthour-snapshots-placeholder" }
   ],
+  // Copies the snapshots that snapshots.yml publishes to GitHub Pages into SNAPSHOTS (src/refresh.ts).
+  "triggers": { "crons": ["*/15 * * * *"] },
   "observability": { "enabled": true }
 }
