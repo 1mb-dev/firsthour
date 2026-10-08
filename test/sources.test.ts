@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { select } from '../src/select.ts';
-import { commentsUrl, hn, itemUrl, pickThreads, threadLabel, titleOf, toCandidates, topLevelComments } from '../src/sources/hn.ts';
+import {
+  BASELINE_KEY,
+  buildBaseline,
+  commentsUrl,
+  hn,
+  itemUrl,
+  parseBaseline,
+  pickThreads,
+  threadLabel,
+  titleOf,
+  toCandidates,
+  topLevelComments,
+} from '../src/sources/hn.ts';
 import { firstLine, htmlToText } from '../src/text.ts';
 import { parseJobs, yc } from '../src/sources/yc.ts';
 import { SourceError, type Deps } from '../src/types.ts';
@@ -19,6 +31,22 @@ function fakeFetch(routes: Record<string, unknown>): typeof fetch {
 function deps(fetchFn: typeof fetch): Deps {
   return { fetch: fetchFn, now: NOW, userAgent: 'test', signal: new AbortController().signal };
 }
+
+const HOUR = 60 * 60 * 1000;
+// The fixture thread is six days old at NOW; two hours in, it is young enough to fetch whole.
+const YOUNG = new Date(Date.parse(META.thread.created_at) + 2 * HOUR);
+
+const algolia = (comments: unknown = fixture('hn-comments.json')) => ({ author_whoishiring: fixture('hn-threads.json'), [`story_${META.thread.id}`]: comments });
+
+function recording(routes: Record<string, unknown>): { urls: string[]; fetch: typeof fetch } {
+  const urls: string[] = [];
+  const inner = fakeFetch(routes);
+  return { urls, fetch: ((input, init) => (urls.push(String(input)), inner(input, init))) as typeof fetch };
+}
+
+const filtersOf = (urls: string[]) => urls.flatMap((u) => new URL(u).searchParams.get('numericFilters') ?? []);
+
+const kvWith = (value: unknown): Deps['kv'] => ({ get: (async (key: string) => (key === BASELINE_KEY ? value : null)) as never });
 
 describe('hn adapter', () => {
   it('picks the newest Who is hiring thread and labels it by month', () => {
@@ -95,29 +123,30 @@ describe('hn adapter', () => {
     expect(lazy).toEqual(select(eager, NOW));
   });
 
-  it('loads only the last seven days of the thread', async () => {
-    const urls: string[] = [];
-    const routes = fakeFetch({ author_whoishiring: fixture('hn-threads.json'), [`story_${META.thread.id}`]: fixture('hn-comments.json') });
-    await hn.load(deps(((input, init) => (urls.push(String(input)), routes(input, init))) as typeof fetch));
-    const since = Math.floor((NOW.getTime() - 7 * 24 * 60 * 60 * 1000) / 1000);
-    expect(urls.map((u) => new URL(u).searchParams.get('numericFilters'))).toContain(`parent_id=${META.thread.id},created_at_i>=${since}`);
+  it('fetches a thread under a day old whole, last seven days only, when there is no baseline', async () => {
+    const { urls, fetch } = recording(algolia());
+    const loaded = await hn.load({ ...deps(fetch), now: YOUNG });
+    expect(loaded.thread_at).toBe(META.thread.created_at);
+    expect(loaded.posts.length).toBeGreaterThan(30);
+    expect(loaded.error).toBeUndefined();
+    const since = Math.floor((YOUNG.getTime() - 7 * 24 * HOUR) / 1000);
+    expect(filtersOf(urls)).toEqual([`parent_id=${META.thread.id},created_at_i>=${since}`]);
+  });
+
+  it("serves no postings past a thread's first day without a baseline, and fetches none", async () => {
+    const { urls, fetch } = recording(algolia());
+    expect(await hn.load(deps(fetch))).toEqual({ posts: [], thread_at: META.thread.created_at, error: 'no baseline' });
+    expect(filtersOf(urls)).toEqual([]);
   });
 
   it('reports truncated when Algolia matched more than it returned, and keeps the postings', async () => {
     const comments = fixture('hn-comments.json') as { hits: unknown[] };
-    const load = (nbHits?: number) =>
-      hn.load(deps(fakeFetch({ author_whoishiring: fixture('hn-threads.json'), [`story_${META.thread.id}`]: { ...comments, ...(nbHits !== undefined && { nbHits }) } })));
+    const load = (nbHits?: number) => hn.load({ ...deps(fakeFetch(algolia({ ...comments, ...(nbHits !== undefined && { nbHits }) }))), now: YOUNG });
     const cut = await load(comments.hits.length + 1);
     expect(cut.error).toBe('truncated');
     expect(cut.posts.length).toBeGreaterThan(30);
     expect((await load(comments.hits.length)).error).toBeUndefined();
     expect((await load()).error).toBeUndefined();
-  });
-
-  it('loads end to end through fetch', async () => {
-    const loaded = await hn.load(deps(fakeFetch({ author_whoishiring: fixture('hn-threads.json'), [`story_${META.thread.id}`]: fixture('hn-comments.json') })));
-    expect(loaded.thread_at).toBe(META.thread.created_at);
-    expect(loaded.posts.length).toBeGreaterThan(30);
   });
 
   it('fails with the HTTP status code', async () => {
@@ -160,6 +189,87 @@ describe('hn adapter', () => {
     const err = await hn.load(deps(fakeFetch({ author_whoishiring: new Response('<html>', { status: 200 }) }))).catch((e) => e);
     expect(err).toBeInstanceOf(SourceError);
     expect(err.code).toBe('parse');
+  });
+});
+
+describe('hn baseline + delta', () => {
+  const [thread] = pickThreads(fixture('hn-threads.json'));
+  const comments = topLevelComments(fixture('hn-comments.json'), META.thread.id);
+  const T0 = NOW.getTime() - 6 * HOUR;
+  const older = comments.filter((c) => Date.parse(c.created_at) <= T0);
+  /** What the job wrote a minute after T0, as read back from KV. */
+  const stored = (overrides: Record<string, unknown> = {}) => JSON.parse(JSON.stringify({ ...buildBaseline(thread!, older, new Date(T0 + 60_000)), ...overrides }));
+  const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
+
+  /** Algolia honouring the created_at_i filter, as the live API does. */
+  function sinceAware(): { urls: string[]; fetch: typeof fetch } {
+    const urls: string[] = [];
+    const all = fixture('hn-comments.json') as { hits: { created_at: string }[] };
+    const fetchFn = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes('author_whoishiring')) return Response.json(fixture('hn-threads.json'));
+      const since = Number(/created_at_i>=(\d+)/.exec(new URL(url).searchParams.get('numericFilters') ?? '')?.[1] ?? 0);
+      return Response.json({ hits: all.hits.filter((h) => Date.parse(h.created_at) >= since * 1000) });
+    }) as typeof fetch;
+    return { urls, fetch: fetchFn };
+  }
+
+  it('selects exactly what a full fetch would, from the baseline plus postings since its watermark', async () => {
+    expect(older.length).toBeGreaterThan(0);
+    expect(older.length).toBeLessThan(comments.length);
+    const loaded = await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(stored()) });
+    expect(loaded.error).toBeUndefined();
+    expect(select(loaded.posts, NOW)).toEqual(select(toCandidates(comments, thread!), NOW));
+  });
+
+  it('asks only for postings since the watermark, less five minutes', async () => {
+    const { urls, fetch } = sinceAware();
+    await hn.load({ ...deps(fetch), kv: kvWith(stored()) });
+    const watermark = Math.floor(Date.parse(stored().watermark) / 1000);
+    expect(filtersOf(urls)).toEqual([`parent_id=${META.thread.id},created_at_i>=${watermark - 300}`]);
+  });
+
+  it('keeps a baseline posting whose remote marker sits past the stored title cut', async () => {
+    const long = { id: '99', created_at: ago(7 * HOUR), html: `Acme | Backend Engineer | ${'Berlin, '.repeat(25)}| REMOTE<p>About us` };
+    const base = JSON.parse(JSON.stringify(buildBaseline(thread!, [long], new Date(T0 + 60_000))));
+    expect(base.items.map((i: { title: string }) => i.title.includes('REMOTE'))).toEqual([false]);
+    const loaded = await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(base) });
+    expect(select(loaded.posts, NOW).map((i) => i.id)).toContain('hn:99');
+  });
+
+  it('marks a baseline older than 9h stale and keeps its postings', async () => {
+    const loaded = await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(stored({ generated: ago(10 * HOUR) })) });
+    expect(loaded.error).toBe('stale');
+    expect(loaded.posts.filter((p) => p.pregated)).toHaveLength(stored().items.length);
+  });
+
+  it('drops a baseline older than 24h', async () => {
+    expect(await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(stored({ generated: ago(25 * HOUR) })) })).toMatchObject({ posts: [], error: 'no baseline' });
+  });
+
+  it('ignores a baseline for another thread', async () => {
+    expect(await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(stored({ thread_id: '1' })) })).toMatchObject({ posts: [], error: 'no baseline' });
+  });
+
+  it('fails with schema on a malformed baseline', async () => {
+    await expect(hn.load({ ...deps(sinceAware().fetch), kv: kvWith({ items: 'x' }) })).rejects.toMatchObject({ code: 'schema' });
+    expect(() => parseBaseline(stored({ watermark: 'soon' }))).toThrow(SourceError);
+  });
+
+  it('rebuilds item urls from validated ids and drops items that fail validation', () => {
+    const item = { where: 'HN Who is hiring (Oct)', title: 'Acme | REMOTE', posted_at: ago(HOUR) };
+    const parsed = parseBaseline(
+      stored({
+        items: [
+          { ...item, id: 'hn:12', url: 'https://evil.example/' },
+          { ...item, id: 'hn:x', url: itemUrl('1') },
+          { ...item, id: 'yc:13', url: itemUrl('13') },
+          { ...item, id: 'hn:14', posted_at: 'yesterday' },
+        ],
+      }),
+    );
+    expect(parsed.items).toEqual([{ ...item, id: 'hn:12', source: 'hn', url: itemUrl('12') }]);
   });
 });
 

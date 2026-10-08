@@ -15,6 +15,8 @@ export interface Candidate extends Item {
   body: string;
   /** Structured remote flag from an ATS. Undefined means the text gate decides. */
   remote?: boolean;
+  /** Passed every gate when its snapshot was built, on a title since truncated: only window, sort and cap apply. */
+  pregated?: boolean;
 }
 
 export interface Deps {

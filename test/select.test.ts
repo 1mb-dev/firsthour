@@ -66,6 +66,12 @@ describe('deny list', () => {
     expect(select(dropped, NOW)).toEqual([]);
   });
 
+  it('applies only the window to pregated candidates', () => {
+    const kept = candidate({ id: 'hn:1', title: 'Acme', body: 'an unpaid position', pregated: true });
+    const old = candidate({ id: 'hn:2', title: 'Acme', pregated: true, posted_at: minutesAgo(8 * 24 * 60) });
+    expect(select([kept, old], NOW).map((i) => i.id)).toEqual(['hn:1']);
+  });
+
   it('matches across extra whitespace', () => {
     expect(select([candidate({ body: 'equity\n  only' })], NOW)).toEqual([]);
   });

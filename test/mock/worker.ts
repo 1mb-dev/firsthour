@@ -11,6 +11,7 @@ import yc from '../fixtures/yc-jobs.json' with { type: 'json' };
 import type { Board } from '../../src/boards/discover.ts';
 import { buildSnapshot, SNAPSHOT_KEY } from '../../src/boards/snapshot.ts';
 import { buildPosts, type PostsBody } from '../../src/posts.ts';
+import { BASELINE_KEY, buildBaseline, pickThreads, topLevelComments } from '../../src/sources/hn.ts';
 import { ADAPTERS } from '../../src/sources/index.ts';
 import { route, USER_AGENT, withSecurityHeaders } from '../../src/app.ts';
 
@@ -36,7 +37,12 @@ function fixtureFetch(failing: readonly string[]): typeof fetch {
 
 async function fixtureKv(now: Date, missing: boolean): Promise<Pick<KVNamespace, 'get'>> {
   const run = await buildSnapshot(meta.boards as Board[], async (b) => BOARD_JSON[b.platform], now);
-  return { get: (async (key: string) => (key === SNAPSHOT_KEY && !missing ? run.snapshot : null)) as never };
+  const [thread] = pickThreads(threads);
+  const values: Record<string, unknown> = {
+    [SNAPSHOT_KEY]: run.snapshot,
+    [BASELINE_KEY]: thread && buildBaseline(thread, topLevelComments(comments, thread.id), now),
+  };
+  return { get: (async (key: string) => (missing ? null : (values[key] ?? null))) as never };
 }
 
 /**
