@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { select } from '../src/select.ts';
 import {
+  ALGOLIA_BUDGET_MS,
   BASELINE_KEY,
   buildBaseline,
   commentsUrl,
@@ -259,6 +260,19 @@ describe('hn baseline + delta', () => {
       expect(loaded.posts.every((p) => p.pregated)).toBe(true);
     }
     await expect(hn.load(deps(sinceAware([], { author_whoishiring: 503 }).fetch))).rejects.toMatchObject({ code: '503' });
+  });
+
+  it('serves the baseline when Algolia is slower than its budget, before the source deadline', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const hanging = ((_: unknown, init?: RequestInit) =>
+        new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))) as unknown as typeof fetch;
+      const pending = hn.load({ ...deps(hanging), kv: kvWith(stored()) });
+      await vi.advanceTimersByTimeAsync(ALGOLIA_BUDGET_MS);
+      await expect(pending).resolves.toMatchObject({ error: 'timeout', fetched_at: stored().generated });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('lets the live copy of a posting win even when it now fails a gate', async () => {

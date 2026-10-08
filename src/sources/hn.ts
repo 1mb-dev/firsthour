@@ -1,4 +1,5 @@
 import { fetchJson, hitsOf, isRecord, str } from '../http.ts';
+import { SOURCE_TIMEOUT_MS } from '../posts.ts';
 import { select, WINDOW_MS } from '../select.ts';
 import { firstLine, htmlToText } from '../text.ts';
 import { SourceError, type Adapter, type Candidate, type Deps, type Item, type Loaded } from '../types.ts';
@@ -188,11 +189,24 @@ function fromBaselineOnly(baseline: Baseline, error: SourceError): Loaded {
   return { posts: fromBaseline(baseline), fetched_at: baseline.generated, thread_at: baseline.thread_at, error: error.code };
 }
 
+/** Under the source deadline, so a slow Algolia still leaves time to serve the baseline. */
+export const ALGOLIA_BUDGET_MS = SOURCE_TIMEOUT_MS - 1000;
+
 /**
  * The baseline plus postings newer than its watermark. Without a usable baseline, only a thread
  * under a day old is fetched whole; parsing an older one can exceed the Free plan's CPU limit.
  */
 async function loadHn(deps: Deps): Promise<Loaded> {
+  const budget = new AbortController();
+  const timer = setTimeout(() => budget.abort(), ALGOLIA_BUDGET_MS);
+  try {
+    return await loadWithin({ ...deps, signal: AbortSignal.any([deps.signal, budget.signal]) });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function loadWithin(deps: Deps): Promise<Loaded> {
   const t = deps.now.getTime();
   const [found, stored] = await Promise.allSettled([currentThread(deps), readBaseline(deps.kv)]);
   if (stored.status === 'rejected') throw stored.reason;
