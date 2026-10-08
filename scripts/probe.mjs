@@ -52,18 +52,22 @@ async function recordFixtures() {
   // commentsUrl filters replies out server-side; record a few anyway so the client-side check stays tested.
   const newest = await getJson(`https://hn.algolia.com/api/v1/search_by_date?tags=comment,story_${thread.id}&hitsPerPage=50&attributesToRetrieve=created_at,parent_id&attributesToHighlight=none`);
   const replies = newest.hits.filter((h) => String(h.parent_id) !== thread.id).slice(0, 3);
+  // Ids are re-keyed; a reply's parent is a comment, a posting's parent is the (public) thread.
+  const ids = (h) => ({
+    objectID: anon.itemId(h.objectID),
+    parent_id: String(h.parent_id) === thread.id ? h.parent_id : Number(anon.itemId(h.parent_id)),
+    created_at: h.created_at,
+  });
   await save('hn-comments.json', {
     hits: [
-      ...commentsJson.hits
-        .filter((h) => keep.has(h.objectID))
-        .map((h) => ({ ...pick(h, ['objectID', 'parent_id', 'created_at']), comment_text: anon.comment(h.comment_text ?? '') })),
-      ...replies.map((h) => ({ ...pick(h, ['objectID', 'parent_id', 'created_at']), comment_text: 'Reply text removed.' })),
+      ...commentsJson.hits.filter((h) => keep.has(h.objectID)).map((h) => ({ ...ids(h), comment_text: anon.comment(h.comment_text ?? '') })),
+      ...replies.map((h) => ({ ...ids(h), comment_text: 'Reply text removed.' })),
     ],
   });
 
   const jobsJson = await getJson(JOBS_URL);
   await save('yc-jobs.json', {
-    hits: jobsJson.hits.map((h) => ({ ...pick(h, ['objectID', 'created_at']), title: anon.ycTitle(h.title ?? ''), ...(h.story_text ? { story_text: '' } : {}) })),
+    hits: jobsJson.hits.map((h) => ({ objectID: anon.itemId(h.objectID), created_at: h.created_at, title: anon.ycTitle(h.title ?? ''), ...(h.story_text ? { story_text: '' } : {}) })),
   });
 
   // One board per platform: the first that answers with jobs.

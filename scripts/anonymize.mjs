@@ -6,6 +6,8 @@ import { extractBoards } from '../src/boards/discover.ts';
 import { isPostingShape, SEPARATOR } from '../src/select.ts';
 import { firstLine, htmlToText } from '../src/text.ts';
 
+/** HN item ids from here are synthetic; real ones passed 1,000,000 in 2010. Thread ids stay real. */
+export const SYNTHETIC_ID_LIMIT = 1_000_000;
 export const ATS_HOSTS = { ashby: 'jobs.ashbyhq.com', greenhouse: 'job-boards.greenhouse.io', lever: 'jobs.lever.co' };
 const FILLER = 'Details of the role, the team and how to apply are in the original post.';
 const APPLICANT = "I'm applying for the backend role above; my details are in my profile.";
@@ -29,7 +31,15 @@ function encode(text) {
 export function createAnonymizer() {
   const companies = new Map();
   const slugs = new Map();
+  const items = new Map();
   let jobCount = 0;
+
+  /** Comment and story ids: a real one resolves to the original post, naming its company. */
+  function itemId(id) {
+    const key = String(id);
+    if (!items.has(key)) items.set(key, String(100_001 + items.size));
+    return items.get(key);
+  }
 
   function companyAlias(name) {
     const key = name.toLowerCase();
@@ -104,5 +114,5 @@ export function createAnonymizer() {
     });
   }
 
-  return { comment, ycTitle, board, boardJobs };
+  return { comment, ycTitle, board, boardJobs, itemId };
 }
