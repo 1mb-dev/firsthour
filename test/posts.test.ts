@@ -45,6 +45,7 @@ describe('buildPosts', () => {
     const body = await buildPosts([ok('boards', 2, { error: 'stale' })], deps);
     expect(body.sources[0]).toMatchObject({ ok: false, error: 'stale', count: 2 });
     expect(body.items).toHaveLength(2);
+    expect(allFailed(body)).toBe(false);
   });
 
   it('times out a hung source without blocking the rest', async () => {

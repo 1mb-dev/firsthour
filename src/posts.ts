@@ -78,6 +78,7 @@ export async function buildPosts(
   };
 }
 
+/** No source answered and none carried posts: a stale source with items still counts as data. */
 export function allFailed(body: PostsBody): boolean {
-  return body.sources.every((s) => !s.ok);
+  return body.sources.every((s) => !s.ok && s.count === 0);
 }

@@ -10,15 +10,16 @@ import { fixture, META, NOW } from './helpers.ts';
 
 const ORIGIN = 'https://firsthour.1mb.dev';
 
-function status(id: SourceStatus['id'], error: string | null): SourceStatus {
-  return { id, ok: error === null, fetched_at: NOW.toISOString(), error, count: 0 };
+function status(id: SourceStatus['id'], error: string | null, count: number): SourceStatus {
+  return { id, ok: error === null, fetched_at: NOW.toISOString(), error, count };
 }
 
-function body(errors: [string | null, string | null, string | null], title = 'Acme | Backend | REMOTE'): PostsBody {
+/** One boards item; `counts` defaults to none, so a source that failed carried nothing. */
+function body(errors: [string | null, string | null, string | null], title = 'Acme | Backend | REMOTE', counts: [number, number, number] = [0, 0, 1]): PostsBody {
   return {
     generated: NOW.toISOString(),
     stale: false,
-    sources: [status('hn', errors[0]), status('yc', errors[1]), status('boards', errors[2])],
+    sources: [status('hn', errors[0], counts[0]), status('yc', errors[1], counts[1]), status('boards', errors[2], errors[2] === null ? counts[2] : 0)],
     next_thread: '2026-11-02T16:00:00.000Z',
     items: [{ id: 'boards:1', source: 'boards', where: 'Acme careers', title, posted_at: NOW.toISOString(), url: 'https://jobs.lever.co/acme/1' }],
   };
@@ -59,11 +60,24 @@ describe('cachedPosts', () => {
     expect(second.body.items[0]?.title).toBe('first');
   });
 
-  it('caches a partial failure as fresh, with its error status', async () => {
+  it('caches a partial failure as fresh, with its error status, but never as last-good', async () => {
     const { cache, store } = memoryCache();
     const served = await serve(cache, body([null, '429', null]));
     expect(served.body.sources[1]).toMatchObject({ ok: false, error: '429' });
     expect(store.has(`${ORIGIN}/__cache/posts/fresh`)).toBe(true);
+    expect(store.has(`${ORIGIN}/__cache/posts/last-good`)).toBe(false);
+  });
+
+  it('serves and caches a build whose only data is stale, rather than an older last-good', async () => {
+    const { cache, store } = memoryCache();
+    await serve(cache, body([null, null, null], 'complete'));
+    store.delete(`${ORIGIN}/__cache/posts/fresh`);
+    const degraded = body(['stale', '429', 'stale'], 'stale but current', [2, 0, 0]);
+    const served = await serve(cache, degraded);
+    expect(served.body).toEqual(degraded);
+    expect(store.has(`${ORIGIN}/__cache/posts/fresh`)).toBe(true);
+    const lastGood = (await store.get(`${ORIGIN}/__cache/posts/last-good`)!.clone().json()) as PostsBody;
+    expect(lastGood.items[0]?.title).toBe('complete');
   });
 
   it('serves last-good marked stale, with current statuses, when every source failed', async () => {

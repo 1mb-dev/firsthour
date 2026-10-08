@@ -11,8 +11,8 @@ function entry(body: PostsBody, ttlSeconds: number): Response {
 }
 
 /**
- * Fresh for five minutes, then rebuilt. A rebuild where every source failed is never cached: it
- * serves the last good body marked stale, or itself when there is none.
+ * Fresh for five minutes, then rebuilt. A rebuild with no data at all is never cached: it serves
+ * the last good body marked stale, or itself when there is none.
  */
 export async function cachedPosts(
   cache: PostsCache,
@@ -28,7 +28,10 @@ export async function cachedPosts(
 
   const body = await build();
   if (!allFailed(body)) {
-    waitUntil(Promise.all([cache.put(freshKey, entry(body, FRESH_TTL_S)), cache.put(lastGoodKey, entry(body, LAST_GOOD_TTL_S))]));
+    const writes = [cache.put(freshKey, entry(body, FRESH_TTL_S))];
+    // Last-good stands in during a total outage, so only a complete build may replace it.
+    if (body.sources.every((s) => s.ok)) writes.push(cache.put(lastGoodKey, entry(body, LAST_GOOD_TTL_S)));
+    waitUntil(Promise.all(writes));
     return body;
   }
   const lastGood = await cache.match(lastGoodKey);
