@@ -11,8 +11,8 @@
   },
   "routes": [{ "pattern": "firsthour.1mb.dev", "custom_domain": true }],
   "kv_namespaces": [
-    // Placeholder until the namespace is created (Phase 4). `wrangler dev` uses local storage regardless.
-    { "binding": "SNAPSHOTS", "id": "firsthour-snapshots-placeholder" }
+    // "firsthour-snapshots". Written only by the Worker's refresh cron; `wrangler dev` uses local storage.
+    { "binding": "SNAPSHOTS", "id": "99cad86197e943a585807e31e78e0da2" }
   ],
   // Copies the snapshots that snapshots.yml publishes to GitHub Pages into SNAPSHOTS (src/refresh.ts).
   "triggers": { "crons": ["*/15 * * * *"] },
