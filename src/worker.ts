@@ -7,7 +7,7 @@ import { ADAPTERS } from './sources/index.ts';
 
 // Phase 3 wraps this in the fresh/last-good cache.
 const livePosts: PostsLoader = (env) =>
-  buildPosts(ADAPTERS, { fetch: (input, init) => fetch(input, init), now: new Date(), userAgent: USER_AGENT, kv: env.BOARDS });
+  buildPosts(ADAPTERS, { fetch: (input, init) => fetch(input, init), now: new Date(), userAgent: USER_AGENT, kv: env.SNAPSHOTS });
 
 export default {
   fetch: (request, env, ctx) => route(request, env, ctx, livePosts),

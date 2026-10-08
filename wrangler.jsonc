@@ -11,7 +11,7 @@
   },
   "kv_namespaces": [
     // Placeholder until the namespace is created (Phase 4). `wrangler dev` uses local storage regardless.
-    { "binding": "BOARDS", "id": "firsthour-boards-placeholder" }
+    { "binding": "SNAPSHOTS", "id": "firsthour-snapshots-placeholder" }
   ],
   "observability": { "enabled": true }
 }

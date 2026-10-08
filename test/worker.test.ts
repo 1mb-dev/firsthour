@@ -7,7 +7,7 @@ const worker = entry.default;
 
 const env = {
   ASSETS: { fetch: async () => new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } }) },
-  BOARDS: {},
+  SNAPSHOTS: {},
 } as unknown as Env;
 const ctx = {} as ExecutionContext;
 
