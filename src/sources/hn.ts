@@ -75,18 +75,27 @@ export function topLevelComments(json: unknown, threadId: string): Comment[] {
   return comments;
 }
 
+/** First line of the text, read from the first paragraph alone when that is enough. */
+export function titleOf(html: string): string {
+  const end = html.search(/<p>/i);
+  return (end > 0 && firstLine(htmlToText(html.slice(0, end)))) || firstLine(htmlToText(html));
+}
+
+/** `body` converts on first read: only the deny check reads it, and select runs that last. */
 export function toCandidates(comments: Comment[], thread: Thread): Candidate[] {
   const where = threadLabel(thread);
   return comments.map((c) => {
-    const body = htmlToText(c.html);
+    let body: string | undefined;
     return {
       id: `hn:${c.id}`,
       source: 'hn',
       where,
-      title: firstLine(body),
+      title: titleOf(c.html),
       posted_at: c.created_at,
       url: itemUrl(c.id),
-      body,
+      get body() {
+        return (body ??= htmlToText(c.html));
+      },
     };
   });
 }

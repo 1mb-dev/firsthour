@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DENY_PHRASES } from '../src/deny.ts';
 import { CAP, isPostingShape, select, textRemote, TITLE_MAX } from '../src/select.ts';
+import type { Candidate } from '../src/types.ts';
 import { candidate, minutesAgo, NOW } from './helpers.ts';
 
 describe('posting gate (hn)', () => {
@@ -52,6 +53,17 @@ describe('deny list', () => {
   it.each(DENY_PHRASES)('drops "%s" in the title or the body', (phrase) => {
     expect(select([candidate({ title: `Acme | ${phrase} | REMOTE` })], NOW)).toEqual([]);
     expect(select([candidate({ body: `Note: this is an ${phrase.toUpperCase()} gig.` })], NOW)).toEqual([]);
+  });
+
+  it('reads the body only for candidates that pass every other gate', () => {
+    const unread = (overrides: Partial<Candidate>) =>
+      Object.defineProperty(candidate(overrides), 'body', {
+        get: () => {
+          throw new Error('body read');
+        },
+      });
+    const dropped = [unread({ title: 'I am applying for this role' }), unread({ title: 'Acme | Engineer | Onsite' }), unread({ posted_at: minutesAgo(8 * 24 * 60) })];
+    expect(select(dropped, NOW)).toEqual([]);
   });
 
   it('matches across extra whitespace', () => {

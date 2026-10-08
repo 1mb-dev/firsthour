@@ -61,9 +61,11 @@ export function select(candidates: readonly Candidate[], now: Date): Item[] {
   const kept: { item: Item; ts: number; order: number }[] = [];
 
   candidates.forEach((c, order) => {
-    if (seen.has(c.id) || !passesPostingGate(c) || isDenied(c) || !isRemote(c)) return;
+    if (seen.has(c.id) || !passesPostingGate(c) || !isRemote(c)) return;
     const ts = Date.parse(c.posted_at);
     if (!Number.isFinite(ts) || ts > t + FUTURE_SKEW_MS || t - ts > WINDOW_MS) return;
+    // Last: the only gate that reads the body, which hn converts on first read.
+    if (isDenied(c)) return;
     seen.add(c.id);
     kept.push({
       ts,

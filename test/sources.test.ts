@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { select } from '../src/select.ts';
-import { commentsUrl, hn, pickThreads, threadLabel, toCandidates, topLevelComments } from '../src/sources/hn.ts';
+import { commentsUrl, hn, itemUrl, pickThreads, threadLabel, titleOf, toCandidates, topLevelComments } from '../src/sources/hn.ts';
+import { firstLine, htmlToText } from '../src/text.ts';
 import { parseJobs, yc } from '../src/sources/yc.ts';
 import { SourceError, type Deps } from '../src/types.ts';
 import { fixture, META, NOW } from './helpers.ts';
@@ -71,6 +72,27 @@ describe('hn adapter', () => {
     expect(params(commentsUrl('42')).get('hitsPerPage')).toBe('1000');
     expect(params(commentsUrl('42')).get('numericFilters')).toBe('parent_id=42');
     expect(params(commentsUrl('42', 1759300000)).get('numericFilters')).toBe('parent_id=42,created_at_i>=1759300000');
+  });
+
+  it('reads the title from the first paragraph, else from the whole text', () => {
+    expect(titleOf('Acme | REMOTE<p>Body &amp; more')).toBe('Acme | REMOTE');
+    expect(titleOf('Acme<br>Second line<p>Body')).toBe('Acme');
+    expect(titleOf(' <i></i> <p>Acme | REMOTE<p>Body')).toBe('Acme | REMOTE');
+    expect(titleOf('<p>Acme | REMOTE')).toBe('Acme | REMOTE');
+    expect(titleOf('Acme | REMOTE')).toBe('Acme | REMOTE');
+  });
+
+  it('converts bodies lazily without changing titles or selection', () => {
+    const [thread] = pickThreads(fixture('hn-threads.json'));
+    const comments = topLevelComments(fixture('hn-comments.json'), META.thread.id);
+    const lazy = select(toCandidates(comments, thread!), NOW);
+    const eager = comments.map((c) => {
+      const body = htmlToText(c.html);
+      return { id: `hn:${c.id}`, source: 'hn' as const, where: threadLabel(thread!), title: firstLine(body), posted_at: c.created_at, url: itemUrl(c.id), body };
+    });
+    expect(toCandidates(comments, thread!).map((c) => c.title)).toEqual(eager.map((c) => c.title));
+    expect(lazy.length).toBeGreaterThan(0);
+    expect(lazy).toEqual(select(eager, NOW));
   });
 
   it('loads only the last seven days of the thread', async () => {
