@@ -1,0 +1,87 @@
+name: Snapshots
+
+on:
+  schedule:
+    - cron: '7 */4 * * *'
+    # Hourly through the 5th: a thread lands on the first weekday, as late as the 3rd.
+    - cron: '37 * 1-5 * *'
+  # Keep inputs empty: nothing is interpolated into the run.
+  workflow_dispatch:
+
+# Queue, never cancel: a run cancelled mid-deploy is worse than a late one.
+concurrency:
+  group: snapshots
+  cancel-in-progress: false
+
+# No Cloudflare credential here: the Worker cron pulls these files into its own KV (src/refresh.ts).
+# The Pages permissions go only to the deploy job, never to the job that parses HN and ATS text.
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      withheld: ${{ steps.build.outcome == 'failure' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+
+      # Node builtins only, so no npm ci.
+      - id: build
+        continue-on-error: true
+        run: node scripts/snapshots.ts out
+
+      # A deploy replaces the whole site, so carry over the published copy of any file the build withheld:
+      # a missing file reads as a failure to the Worker. The first run has nothing to carry.
+      - name: Keep the published copy of a withheld file
+        run: |
+          mkdir -p out
+          for file in boards.json hn.json; do
+            [ -f "out/$file" ] && continue
+            # Only a 200 counts: curl does not follow a redirect, and would save its body as the file.
+            status=$(curl -sS --max-time 30 -o "out/$file" -w '%{http_code}' "https://1mb-dev.github.io/firsthour/$file?t=$(date +%s)") || status=000
+            if [ "$status" = 200 ]; then
+              echo "kept the published $file"
+            else
+              rm -f "out/$file"
+              echo "::warning::no published $file to keep (HTTP $status)"
+            fi
+          done
+
+      - if: hashFiles('out/*.json') == ''
+        run: |
+          echo "::error::Nothing to publish: the build failed and Pages has no copy to keep."
+          exit 1
+
+      # This repo's Pages carries data only: a docs site deploy would delete these files, and a custom
+      # domain would redirect them, which the Worker refuses. Either fails its refresh cron.
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      # After the deploy, so the carried-over copies still publish: the run is red, the site is not.
+      - if: needs.build.outputs.withheld == 'true'
+        run: |
+          echo "::error::The build withheld a snapshot or failed; see the build job."
+          exit 1
