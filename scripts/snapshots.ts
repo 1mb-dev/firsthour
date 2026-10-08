@@ -32,6 +32,7 @@ const { snapshot, failures, writable } = run.boards;
 const boardsLine = `boards  ok ${snapshot.boards_ok}/${snapshot.boards_total}  items ${snapshot.items.length}`;
 console.log(writable ? `${boardsLine}  ${await save('boards.json', snapshot)}` : `${boardsLine}  WITHHELD: under half the boards answered`);
 for (const { board, error } of failures) console.log(`  failed ${board.platform}:${board.slug} ${error}`);
+for (const { thread_id, error } of run.skipped) console.log(`  discovery skipped thread ${thread_id} ${error}`);
 
 const hnLine = `hn      thread ${run.thread.id}  postings ${run.postings}`;
 console.log(

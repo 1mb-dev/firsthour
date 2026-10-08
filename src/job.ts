@@ -29,6 +29,8 @@ export async function fetchJsonRetry(fetchFn: typeof fetch, url: string, userAge
 export interface JobRun {
   thread: Thread;
   postings: number;
+  /** Older threads that failed to load; discovery ran without them. */
+  skipped: { thread_id: string; error: string }[];
   boards: SnapshotRun;
   /** Null when Algolia cut the current thread short: a partial baseline would hide postings. */
   baseline: Baseline | null;
@@ -41,10 +43,19 @@ export async function runJob(options: { fetch: typeof fetch; now: Date; userAgen
   const threads = pickThreads(await get(THREADS_URL)).slice(0, DISCOVERY_THREADS);
   const thread = threads[0];
   if (!thread) throw new SourceError('no thread');
-  const pages = await Promise.all(threads.map((t) => get(commentsUrl(t.id))));
+  const pages = await Promise.allSettled(threads.map(async (t) => {
+    const json = await get(commentsUrl(t.id));
+    return { comments: topLevelComments(json, t.id), truncated: isTruncated(json) };
+  }));
+  const [first, ...older] = pages;
+  if (first?.status !== 'fulfilled') throw first?.reason;
+  // Older threads only widen discovery: one that fails is skipped, not fatal.
+  const skipped = older.flatMap((page, i) =>
+    page.status === 'rejected' ? [{ thread_id: threads[i + 1]!.id, error: page.reason instanceof SourceError ? page.reason.code : 'internal' }] : [],
+  );
+  const loaded = older.flatMap((page) => (page.status === 'fulfilled' ? [page.value.comments] : []));
   // Newest thread first: discovery names each board after the newest posting that links it.
-  const comments = threads.map((t, i) => topLevelComments(pages[i], t.id));
-  const current = comments[0] ?? [];
-  const boards = await buildSnapshot(discover(comments.flat()), (board) => get(apiUrl(board)), now);
-  return { thread, postings: current.length, boards, baseline: isTruncated(pages[0]) ? null : buildBaseline(thread, current, now) };
+  const current = first.value.comments;
+  const boards = await buildSnapshot(discover([current, ...loaded].flat()), (board) => get(apiUrl(board)), now);
+  return { thread, postings: current.length, skipped, boards, baseline: first.value.truncated ? null : buildBaseline(thread, current, now) };
 }

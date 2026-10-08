@@ -55,6 +55,18 @@ describe('runJob', () => {
     expect(result.boards.writable).toBe(true);
   });
 
+  it('skips an older thread that fails, and still writes both outputs', async () => {
+    const [, older] = pickThreads(fixture('hn-threads.json'));
+    const result = await run(sources({ [`story_${older!.id}`]: () => new Response('', { status: 503 }) }).fetch);
+    expect(result.skipped).toEqual([{ thread_id: older!.id, error: '503' }]);
+    expect(result.boards.writable).toBe(true);
+    expect(result.baseline?.thread_id).toBe(META.thread.id);
+  });
+
+  it('fails when the current thread does not load', async () => {
+    await expect(run(sources({ [`story_${META.thread.id}`]: () => new Response('', { status: 503 }) }).fetch)).rejects.toMatchObject({ code: '503' });
+  });
+
   it('fails when no thread is listed', async () => {
     await expect(run(sources({ author_whoishiring: () => Response.json({ hits: [] }) }).fetch)).rejects.toMatchObject({ code: 'no thread' });
   });
