@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { select } from '../src/select.ts';
-import { hn, pickThreads, threadLabel, toCandidates, topLevelComments } from '../src/sources/hn.ts';
+import { commentsUrl, hn, pickThreads, threadLabel, toCandidates, topLevelComments } from '../src/sources/hn.ts';
 import { parseJobs, yc } from '../src/sources/yc.ts';
 import { SourceError, type Deps } from '../src/types.ts';
 import { fixture, META, NOW } from './helpers.ts';
@@ -64,6 +64,32 @@ describe('hn adapter', () => {
     const items = select(toCandidates(topLevelComments(fixture('hn-comments.json'), META.thread.id), thread!), NOW);
     expect(items.length).toBeGreaterThan(0);
     expect(items.every((i) => /remote/i.test(i.title))).toBe(true);
+  });
+
+  it('asks for top-level comments at the full page size, after since when given', () => {
+    const params = (url: string) => new URL(url).searchParams;
+    expect(params(commentsUrl('42')).get('hitsPerPage')).toBe('1000');
+    expect(params(commentsUrl('42')).get('numericFilters')).toBe('parent_id=42');
+    expect(params(commentsUrl('42', 1759300000)).get('numericFilters')).toBe('parent_id=42,created_at_i>=1759300000');
+  });
+
+  it('loads only the last seven days of the thread', async () => {
+    const urls: string[] = [];
+    const routes = fakeFetch({ author_whoishiring: fixture('hn-threads.json'), [`story_${META.thread.id}`]: fixture('hn-comments.json') });
+    await hn.load(deps(((input, init) => (urls.push(String(input)), routes(input, init))) as typeof fetch));
+    const since = Math.floor((NOW.getTime() - 7 * 24 * 60 * 60 * 1000) / 1000);
+    expect(urls.map((u) => new URL(u).searchParams.get('numericFilters'))).toContain(`parent_id=${META.thread.id},created_at_i>=${since}`);
+  });
+
+  it('reports truncated when Algolia matched more than it returned, and keeps the postings', async () => {
+    const comments = fixture('hn-comments.json') as { hits: unknown[] };
+    const load = (nbHits?: number) =>
+      hn.load(deps(fakeFetch({ author_whoishiring: fixture('hn-threads.json'), [`story_${META.thread.id}`]: { ...comments, ...(nbHits !== undefined && { nbHits }) } })));
+    const cut = await load(comments.hits.length + 1);
+    expect(cut.error).toBe('truncated');
+    expect(cut.posts.length).toBeGreaterThan(30);
+    expect((await load(comments.hits.length)).error).toBeUndefined();
+    expect((await load()).error).toBeUndefined();
   });
 
   it('loads end to end through fetch', async () => {

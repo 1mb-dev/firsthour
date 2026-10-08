@@ -30,7 +30,7 @@ export interface Loaded {
   posts: Candidate[];
   /** When the data was produced, if not now (the boards snapshot). */
   fetched_at?: string;
-  /** Set when the source answered but is degraded (stale snapshot). Posts may still be present. */
+  /** Set when the source answered but is degraded (stale snapshot, truncated page). Posts may still be present. */
   error?: string;
   /** Newest Who is hiring thread, for the next-thread estimate. */
   thread_at?: string;

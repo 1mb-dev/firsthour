@@ -40,7 +40,7 @@ async function recordFixtures() {
   const thread = pickThreads(threadsJson)[0];
   if (!thread) throw new Error('no Who is hiring thread found');
 
-  const commentsJson = await getJson(commentsUrl(thread.id, 1000));
+  const commentsJson = await getJson(commentsUrl(thread.id));
   const top = topLevelComments(commentsJson, thread.id);
   // Up to 8 postings linking each platform, then the newest others, to 40.
   const keep = new Set();
@@ -48,7 +48,9 @@ async function recordFixtures() {
     for (const c of top.filter((c) => c.html.includes(host)).slice(0, 8)) keep.add(c.id);
   }
   for (const c of top) if (keep.size < 40) keep.add(c.id);
-  const replies = commentsJson.hits.filter((h) => String(h.parent_id) !== thread.id).slice(0, 3);
+  // commentsUrl filters replies out server-side; record a few anyway so the client-side check stays tested.
+  const newest = await getJson(`https://hn.algolia.com/api/v1/search_by_date?tags=comment,story_${thread.id}&hitsPerPage=50&attributesToRetrieve=created_at,parent_id&attributesToHighlight=none`);
+  const replies = newest.hits.filter((h) => String(h.parent_id) !== thread.id).slice(0, 3);
   await save('hn-comments.json', {
     hits: [
       ...commentsJson.hits
