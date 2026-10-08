@@ -16,7 +16,7 @@ export function withSecurityHeaders(response: Response): Response {
   return secured;
 }
 
-export type PostsLoader = (env: Env, ctx: ExecutionContext) => Promise<PostsBody>;
+export type PostsLoader = (request: Request, env: Env, ctx: ExecutionContext) => Promise<PostsBody>;
 
 export function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -28,7 +28,7 @@ export async function route(request: Request, env: Env, ctx: ExecutionContext, l
   if (pathname === '/health') return withSecurityHeaders(new Response('ok'));
   if (pathname === '/api/posts') {
     if (request.method !== 'GET') return withSecurityHeaders(new Response('method not allowed', { status: 405, headers: { allow: 'GET' } }));
-    return withSecurityHeaders(json(await loadPosts(env, ctx)));
+    return withSecurityHeaders(json(await loadPosts(request, env, ctx)));
   }
   return withSecurityHeaders(await env.ASSETS.fetch(request));
 }
