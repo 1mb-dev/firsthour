@@ -9,6 +9,7 @@
     // Every response, static or API, goes through the Worker so security headers live in one place.
     "run_worker_first": true
   },
+  "routes": [{ "pattern": "firsthour.1mb.dev", "custom_domain": true }],
   "kv_namespaces": [
     // Placeholder until the namespace is created (Phase 4). `wrangler dev` uses local storage regardless.
     { "binding": "SNAPSHOTS", "id": "firsthour-snapshots-placeholder" }
