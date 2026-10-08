@@ -1,7 +1,7 @@
 import { fetchJson, hitsOf, isRecord, str } from '../http.ts';
-import { WINDOW_MS } from '../select.ts';
+import { select, WINDOW_MS } from '../select.ts';
 import { firstLine, htmlToText } from '../text.ts';
-import { SourceError, type Adapter, type Candidate } from '../types.ts';
+import { SourceError, type Adapter, type Candidate, type Item } from '../types.ts';
 
 const ALGOLIA = 'https://hn.algolia.com/api/v1/search_by_date';
 const THREAD_PREFIX = 'Ask HN: Who is hiring?';
@@ -82,7 +82,7 @@ export function titleOf(html: string): string {
 }
 
 /** `body` converts on first read: only the deny check reads it, and select runs that last. */
-export function toCandidates(comments: Comment[], thread: Thread): Candidate[] {
+export function toCandidates(comments: readonly Comment[], thread: Thread): Candidate[] {
   const where = threadLabel(thread);
   return comments.map((c) => {
     let body: string | undefined;
@@ -98,6 +98,29 @@ export function toCandidates(comments: Comment[], thread: Thread): Candidate[] {
       },
     };
   });
+}
+
+export const BASELINE_KEY = 'hn:latest';
+
+/** The current thread, selected offline. The Worker adds postings newer than `watermark`. */
+export interface Baseline {
+  generated: string;
+  thread_id: string;
+  thread_at: string;
+  /** Newest posting seen, not the build time: Algolia indexes with a lag. */
+  watermark: string;
+  items: Item[];
+}
+
+export function buildBaseline(thread: Thread, comments: readonly Comment[], now: Date): Baseline {
+  const newest = Math.max(Date.parse(thread.created_at), ...comments.map((c) => Date.parse(c.created_at)).filter(Number.isFinite));
+  return {
+    generated: now.toISOString(),
+    thread_id: thread.id,
+    thread_at: thread.created_at,
+    watermark: new Date(newest).toISOString(),
+    items: select(toCandidates(comments, thread), now),
+  };
 }
 
 export const hn: Adapter = {

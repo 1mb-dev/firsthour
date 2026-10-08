@@ -18,6 +18,7 @@ make setup       # Activate tracked git hooks
 make check       # Lint + test (run before submitting)
 make dev         # Worker on localhost via wrangler dev
 make fixtures    # Re-record sanitized fixtures from live sources (manual only)
+make snapshots   # Build the boards snapshot and hn baseline live into the local KV (manual only)
 ```
 
 ## Invariants

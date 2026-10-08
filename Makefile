@@ -1,4 +1,4 @@
-.PHONY: dev mock install lint test test-watch check types fixtures audit clean help setup
+.PHONY: dev mock install lint test test-watch check types fixtures snapshots audit clean help setup
 
 # Development
 dev:                ## Start the Worker locally (wrangler dev)
@@ -32,6 +32,14 @@ audit:              ## Dependency audit (production only)
 # Live sources (manual only; CI never calls them)
 fixtures:           ## Re-record anonymized fixtures from live sources
 	node scripts/probe.mjs fixtures
+
+SNAPSHOTS := .wrangler/snapshots
+snapshots:          ## Build the boards snapshot and hn baseline live, load them into the local KV
+	@rm -rf $(SNAPSHOTS)
+	@node scripts/snapshots.ts $(SNAPSHOTS); status=$$?; \
+	for key in boards hn; do \
+	  [ -f $(SNAPSHOTS)/$$key.json ] && npx wrangler kv key put --local --binding BOARDS $$key:latest --path $(SNAPSHOTS)/$$key.json; \
+	done; exit $$status
 
 clean:              ## Remove local Worker state
 	rm -rf .wrangler
