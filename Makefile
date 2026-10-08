@@ -38,7 +38,9 @@ snapshots:          ## Build the boards snapshot and hn baseline live, load them
 	@rm -rf $(SNAPSHOTS)
 	@node scripts/snapshots.ts $(SNAPSHOTS); status=$$?; \
 	for key in boards hn; do \
-	  [ -f $(SNAPSHOTS)/$$key.json ] && npx wrangler kv key put --local --binding SNAPSHOTS $$key:latest --path $(SNAPSHOTS)/$$key.json; \
+	  if [ -f $(SNAPSHOTS)/$$key.json ]; then \
+	    npx wrangler kv key put --local --binding SNAPSHOTS $$key:latest --path $(SNAPSHOTS)/$$key.json || status=1; \
+	  fi; \
 	done; exit $$status
 
 clean:              ## Remove local Worker state
