@@ -202,12 +202,14 @@ describe('hn baseline + delta', () => {
   const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
 
   /** Algolia honouring the created_at_i filter, as the live API does. */
-  function sinceAware(): { urls: string[]; fetch: typeof fetch } {
+  function sinceAware(extra: { created_at: string; [field: string]: unknown }[] = [], fail: Record<string, number> = {}): { urls: string[]; fetch: typeof fetch } {
     const urls: string[] = [];
-    const all = fixture('hn-comments.json') as { hits: { created_at: string }[] };
+    const all = { hits: [...(fixture('hn-comments.json') as { hits: { created_at: string }[] }).hits, ...extra] };
     const fetchFn = (async (input: RequestInfo | URL) => {
       const url = String(input);
       urls.push(url);
+      const failing = Object.keys(fail).find((k) => url.includes(k));
+      if (failing) return new Response('', { status: fail[failing] });
       if (url.includes('author_whoishiring')) return Response.json(fixture('hn-threads.json'));
       const since = Number(/created_at_i>=(\d+)/.exec(new URL(url).searchParams.get('numericFilters') ?? '')?.[1] ?? 0);
       return Response.json({ hits: all.hits.filter((h) => Date.parse(h.created_at) >= since * 1000) });
@@ -238,22 +240,58 @@ describe('hn baseline + delta', () => {
     expect(select(loaded.posts, NOW).map((i) => i.id)).toContain('hn:99');
   });
 
-  it('marks a baseline older than 9h stale and keeps its postings', async () => {
+  it('marks a baseline older than 9h stale since it was built, and keeps its postings', async () => {
     const loaded = await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(stored({ generated: ago(10 * HOUR) })) });
-    expect(loaded.error).toBe('stale');
-    expect(loaded.posts.filter((p) => p.pregated)).toHaveLength(stored().items.length);
+    expect(loaded).toMatchObject({ error: 'stale', fetched_at: ago(10 * HOUR) });
+    expect(loaded.posts.filter((p) => p.pregated).length).toBeGreaterThan(0);
   });
 
-  it('drops a baseline older than 24h', async () => {
-    expect(await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(stored({ generated: ago(25 * HOUR) })) })).toMatchObject({ posts: [], error: 'no baseline' });
+  it('drops the postings of a baseline older than 24h but still reports it stale since it was built', async () => {
+    const loaded = await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(stored({ generated: ago(25 * HOUR) })) });
+    expect(loaded).toEqual({ posts: [], thread_at: META.thread.created_at, fetched_at: ago(25 * HOUR), error: 'stale' });
+  });
+
+  it('serves the baseline with the error code when Algolia fails, before or after the thread lookup', async () => {
+    for (const failing of ['author_whoishiring', 'tags=comment']) {
+      const loaded = await hn.load({ ...deps(sinceAware([], { [failing]: 503 }).fetch), kv: kvWith(stored()) });
+      expect(loaded).toMatchObject({ error: '503', fetched_at: stored().generated, thread_at: META.thread.created_at });
+      expect(loaded.posts).toHaveLength(stored().items.length);
+      expect(loaded.posts.every((p) => p.pregated)).toBe(true);
+    }
+    await expect(hn.load(deps(sinceAware([], { author_whoishiring: 503 }).fetch))).rejects.toMatchObject({ code: '503' });
+  });
+
+  it('lets the live copy of a posting win even when it now fails a gate', async () => {
+    const posting = { objectID: '77', parent_id: Number(META.thread.id), created_at: new Date(T0 - 60_000).toISOString() };
+    const before = topLevelComments({ hits: [{ ...posting, comment_text: 'Acme | Engineer | REMOTE' }] }, META.thread.id);
+    const base = JSON.parse(JSON.stringify(buildBaseline(thread!, [...older, ...before], new Date(T0 + 60_000))));
+    expect(base.items.map((i: { id: string }) => i.id)).toContain('hn:77');
+    const edited = sinceAware([{ ...posting, comment_text: 'Acme | Engineer | Onsite only' }]);
+    const loaded = await hn.load({ ...deps(edited.fetch), kv: kvWith(base) });
+    expect(select(loaded.posts, NOW).map((i) => i.id)).not.toContain('hn:77');
+  });
+
+  it('reads the baseline while the thread lookup is in flight', async () => {
+    const order: string[] = [];
+    const threads = (async () => {
+      await null;
+      order.push('threads');
+      return Response.json(fixture('hn-threads.json'));
+    }) as unknown as typeof fetch;
+    const kv = { get: (async () => (order.push('kv'), null)) as never };
+    await hn.load({ ...deps(threads), kv });
+    expect(order.slice(0, 2)).toEqual(['kv', 'threads']);
   });
 
   it('ignores a baseline for another thread', async () => {
     expect(await hn.load({ ...deps(sinceAware().fetch), kv: kvWith(stored({ thread_id: '1' })) })).toMatchObject({ posts: [], error: 'no baseline' });
   });
 
-  it('fails with schema on a malformed baseline', async () => {
-    await expect(hn.load({ ...deps(sinceAware().fetch), kv: kvWith({ items: 'x' }) })).rejects.toMatchObject({ code: 'schema' });
+  it('reports a malformed baseline as schema and falls back as if there were none', async () => {
+    expect(await hn.load({ ...deps(sinceAware().fetch), kv: kvWith({ items: 'x' }) })).toMatchObject({ posts: [], error: 'schema' });
+    const young = await hn.load({ ...deps(sinceAware().fetch), now: YOUNG, kv: kvWith({ items: 'x' }) });
+    expect(young.error).toBe('schema');
+    expect(young.posts.length).toBeGreaterThan(0);
     expect(() => parseBaseline(stored({ watermark: 'soon' }))).toThrow(SourceError);
   });
 

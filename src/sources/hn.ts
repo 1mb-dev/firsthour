@@ -159,31 +159,78 @@ async function fetchPostings({ fetch, userAgent, signal }: Deps, thread: Thread,
   return { posts: toCandidates(topLevelComments(json, thread.id), thread), truncated: isTruncated(json) };
 }
 
+async function currentThread({ fetch, userAgent, signal }: Deps): Promise<Thread> {
+  const thread = pickThreads(await fetchJson(fetch, THREADS_URL, userAgent, signal))[0];
+  if (!thread) throw new SourceError('no thread');
+  return thread;
+}
+
+/** A malformed baseline is reported, not fatal: the source falls back as if there were none. */
+async function readBaseline(kv: Deps['kv']): Promise<{ baseline: Baseline | null; invalid: boolean }> {
+  const raw = kv ? await kv.get(BASELINE_KEY, 'json') : null;
+  if (raw === null) return { baseline: null, invalid: false };
+  try {
+    return { baseline: parseBaseline(raw), invalid: false };
+  } catch (error) {
+    if (error instanceof SourceError) return { baseline: null, invalid: true };
+    throw error;
+  }
+}
+
+/** Baseline items, minus any the live delta carries: the live copy wins even when it fails a gate. */
+function fromBaseline(baseline: Baseline, live: readonly Candidate[] = []): Candidate[] {
+  const ids = new Set(live.map((p) => p.id));
+  return baseline.items.filter((item) => !ids.has(item.id)).map((item) => ({ ...item, body: '', pregated: true }));
+}
+
+/** Algolia failed, but the baseline still holds the thread's postings. */
+function fromBaselineOnly(baseline: Baseline, error: SourceError): Loaded {
+  return { posts: fromBaseline(baseline), fetched_at: baseline.generated, thread_at: baseline.thread_at, error: error.code };
+}
+
 /**
  * The baseline plus postings newer than its watermark. Without a usable baseline, only a thread
  * under a day old is fetched whole; parsing an older one can exceed the Free plan's CPU limit.
  */
 async function loadHn(deps: Deps): Promise<Loaded> {
-  const { fetch, userAgent, signal, now, kv } = deps;
-  const thread = pickThreads(await fetchJson(fetch, THREADS_URL, userAgent, signal))[0];
-  if (!thread) throw new SourceError('no thread');
-  const raw = kv ? await kv.get(BASELINE_KEY, 'json') : null;
-  const baseline = raw === null ? null : parseBaseline(raw);
-  const t = now.getTime();
+  const t = deps.now.getTime();
+  const [found, stored] = await Promise.allSettled([currentThread(deps), readBaseline(deps.kv)]);
+  if (stored.status === 'rejected') throw stored.reason;
+  const { baseline, invalid } = stored.value;
+  const age = baseline ? t - Date.parse(baseline.generated) : Infinity;
+  const usable = age <= DROP_AFTER_MS ? baseline : null;
+
+  if (found.status === 'rejected') {
+    if (usable && found.reason instanceof SourceError) return fromBaselineOnly(usable, found.reason);
+    throw found.reason;
+  }
+  const thread = found.value;
   const windowStart = Math.floor((t - WINDOW_MS) / 1000);
 
-  if (baseline?.thread_id === thread.id && t - Date.parse(baseline.generated) <= DROP_AFTER_MS) {
-    const delta = await fetchPostings(deps, thread, Math.max(Math.floor(Date.parse(baseline.watermark) / 1000) - OVERLAP_S, windowStart));
-    // Delta first, so the live copy wins where the two overlap.
-    const posts = [...delta.posts, ...baseline.items.map((item) => ({ ...item, body: '', pregated: true }))];
-    const error = delta.truncated ? 'truncated' : t - Date.parse(baseline.generated) > STALE_AFTER_MS ? 'stale' : undefined;
-    return { posts, thread_at: thread.created_at, ...(error && { error }) };
+  if (usable?.thread_id === thread.id) {
+    let delta: Awaited<ReturnType<typeof fetchPostings>>;
+    try {
+      delta = await fetchPostings(deps, thread, Math.max(Math.floor(Date.parse(usable.watermark) / 1000) - OVERLAP_S, windowStart));
+    } catch (error) {
+      if (error instanceof SourceError) return fromBaselineOnly(usable, error);
+      throw error;
+    }
+    const stale = age > STALE_AFTER_MS;
+    const error = delta.truncated ? 'truncated' : stale ? 'stale' : undefined;
+    return {
+      posts: [...delta.posts, ...fromBaseline(usable, delta.posts)],
+      thread_at: thread.created_at,
+      ...(stale && { fetched_at: usable.generated }),
+      ...(error && { error }),
+    };
   }
   if (t - Date.parse(thread.created_at) < FULL_FETCH_MAX_AGE_MS) {
     const full = await fetchPostings(deps, thread, windowStart);
-    return { posts: full.posts, thread_at: thread.created_at, ...(full.truncated && { error: 'truncated' }) };
+    const error = full.truncated ? 'truncated' : invalid ? 'schema' : undefined;
+    return { posts: full.posts, thread_at: thread.created_at, ...(error && { error }) };
   }
-  return { posts: [], thread_at: thread.created_at, error: 'no baseline' };
+  if (baseline?.thread_id === thread.id) return { posts: [], thread_at: thread.created_at, fetched_at: baseline.generated, error: 'stale' };
+  return { posts: [], thread_at: thread.created_at, error: invalid ? 'schema' : 'no baseline' };
 }
 
 export const hn: Adapter = { id: 'hn', load: loadHn };
