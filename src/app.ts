@@ -5,7 +5,7 @@ export const USER_AGENT = `firsthour/${pkg.version} (+https://github.com/1mb-dev
 
 export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'content-security-policy':
-    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
 };
