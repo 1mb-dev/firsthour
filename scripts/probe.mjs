@@ -97,6 +97,14 @@ async function checkWorker(base) {
   for (const s of body.sources ?? []) console.log(`  ${s.id.padEnd(7)} ok=${s.ok} count=${s.count} error=${s.error} fetched_at=${s.fetched_at}`);
   let failed = !response.ok || !body.sources?.every((s) => s.ok);
 
+  // default-src 'none' blocks the page's own font without a page error; only the console says so.
+  const page = await fetch(base, { headers: { 'user-agent': UA } });
+  const fontSrc = page.headers.get('content-security-policy')?.includes("font-src 'self'") ?? false;
+  const font = await fetch(new URL('/fonts/recursive.woff2', base), { headers: { 'user-agent': UA } });
+  const fontType = font.headers.get('content-type');
+  console.log(`font         csp font-src=${fontSrc}  ${font.status} ${fontType}`);
+  failed ||= !fontSrc || font.status !== 200 || fontType !== 'font/woff2';
+
   // Replies in the hn response would count toward the 1000-hit cap.
   const threads = pickThreads(await getJson(THREADS_URL)).slice(0, 3);
   const pages = await Promise.all(threads.map((t) => getJson(commentsUrl(t.id))));

@@ -7,25 +7,30 @@
     <meta name="description" content="Fresh remote roles from Hacker News and the companies hiring there, while they are still new." />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/recursive.woff2" as="font" type="font/woff2" crossorigin />
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/app.js"></script>
   </head>
   <body>
-    <header>
-      <h1>firsthour</h1>
-      <p class="tagline">Fresh remote roles from Hacker News and the companies hiring there.</p>
-      <p id="status" class="status" aria-live="polite"></p>
+    <header class="masthead">
+      <div>
+        <h1>firsthour</h1>
+        <p class="tagline">Remote roles from Hacker News and its hiring companies, logged as they appear.</p>
+      </div>
       <nav class="theme" aria-label="Theme">
         <button type="button" data-theme-choice="auto">auto</button>
         <button type="button" data-theme-choice="light">light</button>
         <button type="button" data-theme-choice="dark">dark</button>
       </nav>
     </header>
+    <p id="status" class="status" aria-live="polite"></p>
     <main>
-      <label for="q" class="visually-hidden">Filter</label>
-      <input id="q" type="search" placeholder="Filter: go, backend, -onsite" autocomplete="off" spellcheck="false" />
-      <p id="count" class="count" aria-live="polite"></p>
+      <div class="controls">
+        <label for="q" class="visually-hidden">Filter</label>
+        <input id="q" type="search" placeholder="Filter: go, backend, -onsite" autocomplete="off" spellcheck="false" />
+        <p id="count" class="count" aria-live="polite"></p>
+      </div>
       <div id="notice"></div>
       <div id="list" aria-busy="true"><p class="muted">Loading…</p></div>
     </main>

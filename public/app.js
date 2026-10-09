@@ -83,6 +83,7 @@ function render() {
   ]
     .filter(Boolean)
     .join(' · ');
+  count.classList.toggle('has-new', Boolean(seen && fresh > 0));
 
   if (allDown(posts)) {
     list.replaceChildren(el('p', { class: 'empty', text: 'Every source is unavailable right now.' }), retryButton());
@@ -106,7 +107,7 @@ function render() {
   list.replaceChildren(
     ...(groups[0]?.label === 'First hour' ? [] : [nextThreadLine(posts)]),
     ...groups.map((g) =>
-      el('section', {}, [
+      el('section', { class: g.label === 'First hour' ? 'first' : '' }, [
         el('h2', { text: g.label }),
         el(
           'ol',
