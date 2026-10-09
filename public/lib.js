@@ -161,9 +161,11 @@ export function isRead(item, seen) {
   return seen !== null && seen.read.has(item.id);
 }
 
-// A URL, bare `www.` host, or one cut short by the 160-char title cap ("https:…"). Wrapping parens go with it;
-// a paren that closes surrounding text stays, so "(listed here https://x)" keeps its ")".
-const URLISH = /\((?:https?:|www\.)[^\s)]*\)|\b(?:https?:|www\.)[^\s)]*/gi;
+// A URL or bare `www.` host, with its wrapping parens, the closing one possibly lost to the 160-char title cap.
+// A paren that closes surrounding text stays, so "(listed here https://x)" keeps its ")".
+const URLISH = /\((?:https?:|www\.)[^\s)]*\)?|\b(?:https?:|www\.)[^\s)]*/gi;
+// The cap can also cut a URL before its colon: "(http…", "ww…".
+const CUT_URL = /\s*\(?\b(?:h(?:t(?:t(?:ps?)?)?)?|w{1,3})…$/i;
 const EDGES = /^[\s,;:·-]+|[\s,;:·-]+$/g;
 
 /**
@@ -174,7 +176,7 @@ const EDGES = /^[\s,;:·-]+|[\s,;:·-]+$/g;
 export function parts(item) {
   const segs = item.title
     .split('|')
-    .map((s) => s.replace(URLISH, '').replace(/\s+/g, ' ').replace(/ \)/g, ')').replace(EDGES, ''))
+    .map((s) => s.replace(URLISH, '').replace(CUT_URL, '').replace(/\s+/g, ' ').replace(/ \)/g, ')').replace(EDGES, ''))
     .filter(Boolean);
   if (segs.length === 0) return { company: '', role: item.title };
   if (item.source === 'yc' || segs.length < 2) return { company: '', role: segs.join(' · ') };
