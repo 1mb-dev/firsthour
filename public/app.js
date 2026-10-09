@@ -1,5 +1,5 @@
 // @ts-check
-import { age, allDown, group, isActive, isNew, loadSeen, loadTheme, matches, nextSeen, parseFilter, parts, saveSeen, saveTheme, sourceLabel, statusText } from './lib.js';
+import { age, allDown, group, isActive, isNew, isRead, loadSeen, loadTheme, matches, nextSeen, parseFilter, parts, saveSeen, saveTheme, sourceLabel, statusText } from './lib.js';
 
 /** @typedef {import('./lib.js').Posts} Posts */
 
@@ -24,6 +24,8 @@ function storage() {
 const seen = loadSeen(storage());
 /** @type {Posts | null} */
 let posts = null;
+/** @type {string[]} */
+let shown = [];
 /** Ids whose row was on screen during this visit. @type {Set<string>} */
 const viewed = new Set();
 const onScreen = new IntersectionObserver(
@@ -74,6 +76,7 @@ function render() {
   const now = Date.now();
   const filter = parseFilter(input.value);
   const visible = posts.items.filter((item) => matches(item, filter));
+  shown = visible.map((item) => item.id);
   renderStatus(posts);
 
   const fresh = visible.filter((item) => isNew(item, seen)).length;
@@ -125,7 +128,7 @@ function render() {
 function row(item, now) {
   const fresh = isNew(item, seen);
   const { company, role } = parts(item);
-  const a = el('a', { class: fresh ? 'row new' : 'row', href: item.url }, [
+  const a = el('a', { class: ['row', fresh ? 'new' : '', isRead(item, seen) ? 'read' : ''].filter(Boolean).join(' '), href: item.url }, [
     el('span', { class: 'age' }, [el('span', { text: age(item.posted_at, now) }), fresh ? el('span', { class: 'mark', text: 'new' }) : null]),
     el('span', { class: 'co', text: company }),
     el('span', { class: 'role', text: role }),
@@ -169,7 +172,7 @@ function onFilter() {
 }
 
 function markSeen() {
-  if (posts) saveSeen(storage(), nextSeen(seen, posts.items.map((item) => item.id), viewed), new Date());
+  if (posts) saveSeen(storage(), nextSeen(seen, posts.items.map((item) => item.id), shown, viewed), new Date());
 }
 
 const themeButtons = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('[data-theme-choice]'));

@@ -6,7 +6,7 @@
  * @typedef {{ id: string, ok: boolean, fetched_at: string, error: string | null, count: number }} Status
  * @typedef {{ generated: string, stale: boolean, sources: Status[], next_thread: string, items: Item[] }} Posts
  * @typedef {{ include: string[], exclude: string[] }} Filter
- * @typedef {{ ids: Set<string>, at: string }} Seen
+ * @typedef {{ ids: Set<string>, read: Set<string>, at: string }} Seen ids listed last visit (arrival); read: rows that were on screen
  * @typedef {'auto' | 'light' | 'dark'} Theme
  */
 
@@ -90,27 +90,35 @@ export function loadSeen(storage) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.ids) || typeof parsed.at !== 'string') return null;
-    return { ids: new Set(parsed.ids.filter((/** @type {unknown} */ id) => typeof id === 'string')), at: parsed.at };
+    const strings = (/** @type {unknown[]} */ list) => new Set(/** @type {string[]} */ (list.filter((id) => typeof id === 'string')));
+    const ids = strings(parsed.ids);
+    // A record from before `read` existed: count everything it listed as read, so nothing jumps back to full ink.
+    return { ids, read: Array.isArray(parsed.read) ? strings(parsed.read) : new Set(ids), at: parsed.at };
   } catch {
     return null;
   }
 }
 
 /**
- * Seen after this visit: what was seen before and is still listed, plus what was on screen now.
- * Rows never scrolled to, or hidden by the filter, stay unseen and keep full ink next visit.
- * @param {Seen | null} seen @param {string[]} listed @param {Iterable<string>} viewed
+ * The record after this visit, pruned to what is still listed. `ids` (arrival): what was listed before plus what the
+ * filter showed now, so filtered-out items still arrive as new later. `read`: what was read before plus what was on
+ * screen now, so rows never scrolled to keep full ink.
+ * @param {Seen | null} seen @param {string[]} listed @param {string[]} shown @param {Iterable<string>} viewed
  */
-export function nextSeen(seen, listed, viewed) {
-  const ids = new Set(viewed);
-  for (const id of listed) if (seen?.ids.has(id)) ids.add(id);
-  return [...ids];
+export function nextSeen(seen, listed, shown, viewed) {
+  const ids = new Set(shown);
+  const read = new Set(viewed);
+  for (const id of listed) {
+    if (seen?.ids.has(id)) ids.add(id);
+    if (seen?.read.has(id)) read.add(id);
+  }
+  return { ids: [...ids], read: [...read] };
 }
 
-/** @param {Pick<Storage, 'setItem'> | undefined} storage @param {string[]} ids @param {Date} at */
-export function saveSeen(storage, ids, at) {
+/** @param {Pick<Storage, 'setItem'> | undefined} storage @param {{ ids: string[], read: string[] }} next @param {Date} at */
+export function saveSeen(storage, next, at) {
   try {
-    storage?.setItem(SEEN_KEY, JSON.stringify({ ids, at: at.toISOString() }));
+    storage?.setItem(SEEN_KEY, JSON.stringify({ ...next, at: at.toISOString() }));
   } catch {
     // Private mode or full storage: markers just won't carry over.
   }
@@ -138,9 +146,14 @@ export function saveTheme(storage, theme) {
   }
 }
 
-/** @param {Item} item @param {Seen | null} seen */
+/** Arrived since the last visit. A first visit has no baseline, so nothing is new. @param {Item} item @param {Seen | null} seen */
 export function isNew(item, seen) {
   return seen !== null && !seen.ids.has(item.id);
+}
+
+/** On screen during an earlier visit. A first visit has read nothing. @param {Item} item @param {Seen | null} seen */
+export function isRead(item, seen) {
+  return seen !== null && seen.read.has(item.id);
 }
 
 // A URL, bare `www.` host, or one cut short by the 160-char title cap ("https:…"). Wrapping parens go with it;

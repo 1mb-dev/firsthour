@@ -27,14 +27,14 @@ Each color is written once as `light-dark(light, dark)`. The system theme picks 
 | Token | Light | Dark | Role | Contrast on paper (light / dark) |
 |---|---|---|---|---|
 | `--paper` | `#e1edf0` | `#051a1d` | page | |
-| `--ink` | `#14202b` | `#cde3e0` | unread rows, text | 13.8 / 13.4 |
-| `--ink-2` | `#45545e` | `#8fabab` | seen rows, meta | 6.6 / 7.3 |
+| `--ink` | `#14202b` | `#cde3e0` | text, rows not read yet | 13.8 / 13.4 |
+| `--ink-2` | `#45545e` | `#8fabab` | read rows, meta | 6.6 / 7.3 |
 | `--signal` | `#0a6b4c` | `#5fd3a5` | new rows, First hour, focus | 5.5 / 9.7 |
 | `--alert` | `#a3261b` | `#ff8f80` | failed sources, stale banner | 6.2 / 8.1 |
 | `--rule-strong` | = ink | = ink | masthead, group rules, input | |
 | `--rule` | `#c3d5d9` | `#17393c` | row dividers (decorative) | |
 
-Every text token reads at 4.5:1 or better on paper in both themes, and the test pins it. Rows you have seen use `--ink-2`, so dimming never drops below that floor.
+Every text token reads at 4.5:1 or better on paper in both themes, and the test pins it. Read rows use `--ink-2`, so dimming never drops below that floor.
 
 The palette is cool on purpose. The sibling sift is a warm cream reading desk, so no firsthour token sits within ΔE 5 (CIE76) of a sift token.
 
@@ -51,11 +51,21 @@ mobile    age │ company                                               │ sour
 - **Source** is one quiet word: `HN`, `HN jobs`, `board`.
 - **Nothing is truncated.** In HN titles the restriction ("US only", "visa possible") usually comes last, so rows wrap instead of cutting. Titles are capped at 160 characters upstream.
 
-## New and seen
+## New and read
 
-- An unseen row has full ink, a signal tick on its left edge, and a signal age. Screen readers get the word "new", which is visually hidden.
-- A row becomes seen only once most of it has been on screen (IntersectionObserver, 60 %). Rows you never scrolled to keep full ink on the next visit.
-- The count line opens with the same tick, as the key: "12 new since Thu, Oct 8, 11:45 AM".
+Two signals, two facts:
+
+| Row | Means |
+|---|---|
+| signal tick, signal age | **new**: arrived since your last visit (it was not listed then) |
+| full ink | not read yet: never on screen in an earlier visit |
+| `--ink-2` | read |
+
+- A row is read once most of it has been on screen (IntersectionObserver, 60 %). Rows you never scrolled to keep full ink, though they lose the tick once they have been listed.
+- The count line opens with the same tick, as the key: "12 new since Thu, Oct 8, 11:45 AM". It counts arrivals only.
+- A first visit has no baseline: no ticks, nothing dimmed.
+- A record from before reading was tracked loads as all read.
+- Screen readers get the word "new", which is visually hidden.
 - **First hour** is the only group header in signal color. It is the event the page is named for, and its one raised voice.
 
 ## Theme

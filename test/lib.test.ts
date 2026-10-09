@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { age, allDown, group, isNew, loadSeen, loadTheme, matches, nextSeen, parseFilter, parts, saveSeen, saveTheme, sourceLabel, statusText } from '../public/lib.js';
+import { age, allDown, group, isNew, isRead, loadSeen, loadTheme, matches, nextSeen, parseFilter, parts, saveSeen, saveTheme, sourceLabel, statusText } from '../public/lib.js';
 
 const NOW = Date.parse('2026-10-07T16:00:00Z');
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
@@ -80,10 +80,24 @@ describe('new since last visit', () => {
     return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) };
   }
 
-  it('marks nothing new on a first visit', () => {
+  it('marks nothing new and nothing read on a first visit', () => {
     const seen = loadSeen(memory());
     expect(seen).toBeNull();
     expect(isNew(item('a', 0), seen)).toBe(false);
+    expect(isRead(item('a', 0), seen)).toBe(false);
+  });
+
+  it('keeps arrival and reading apart: listed but never on screen is neither new nor read', () => {
+    const seen = loadSeen(memory(JSON.stringify({ ids: ['listed', 'read'], read: ['read'], at: ago(60 * MIN) })));
+    expect([isNew(item('listed', 0), seen), isRead(item('listed', 0), seen)]).toEqual([false, false]);
+    expect([isNew(item('read', 0), seen), isRead(item('read', 0), seen)]).toEqual([false, true]);
+    expect([isNew(item('arrived', 0), seen), isRead(item('arrived', 0), seen)]).toEqual([true, false]);
+  });
+
+  it('reads a record from before `read` existed as all read', () => {
+    const seen = loadSeen(memory(JSON.stringify({ ids: ['a'], at: ago(60 * MIN) })));
+    expect(isRead(item('a', 0), seen)).toBe(true);
+    expect(isRead(item('b', 0), seen)).toBe(false);
   });
 
   it('marks unseen ids new on a return visit', () => {
@@ -99,16 +113,19 @@ describe('new since last visit', () => {
     expect(loadSeen(undefined)).toBeNull();
   });
 
-  it('keeps filtered-out items unseen and prunes ids no longer listed', () => {
-    const seen = { ids: new Set(['old', 'gone']), at: ago(MIN) };
-    expect(nextSeen(seen, ['old', 'new', 'hidden'], ['new']).sort()).toEqual(['new', 'old']);
+  it('keeps filtered-out items unseen, rows never on screen unread, and prunes ids no longer listed', () => {
+    const seen = { ids: new Set(['old', 'gone']), read: new Set(['old', 'gone']), at: ago(MIN) };
+    const next = nextSeen(seen, ['old', 'new', 'below', 'hidden'], ['new', 'below'], ['new']);
+    expect(next.ids.sort()).toEqual(['below', 'new', 'old']);
+    expect(next.read.sort()).toEqual(['new', 'old']);
   });
 
   it('round-trips through storage and survives a throwing setItem', () => {
     const store = memory();
-    saveSeen(store, ['a'], new Date(NOW));
-    expect(loadSeen(store)?.ids.has('a')).toBe(true);
-    expect(() => saveSeen({ setItem: () => { throw new Error('full'); } }, ['a'], new Date(NOW))).not.toThrow();
+    saveSeen(store, { ids: ['a', 'b'], read: ['a'] }, new Date(NOW));
+    const loaded = loadSeen(store);
+    expect([loaded?.ids.has('b'), loaded?.read.has('a'), loaded?.read.has('b')]).toEqual([true, true, false]);
+    expect(() => saveSeen({ setItem: () => { throw new Error('full'); } }, { ids: ['a'], read: [] }, new Date(NOW))).not.toThrow();
   });
 });
 
