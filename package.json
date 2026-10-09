@@ -1,7 +1,7 @@
 {
   "name": "firsthour",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Fresh remote roles from Hacker News and the companies hiring there, while they are still new",
   "homepage": "https://firsthour.1mb.dev",
