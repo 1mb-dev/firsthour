@@ -373,6 +373,13 @@ footer p {
   }
 }
 
+@media (pointer: coarse) {
+  .row {
+    min-height: var(--tap);
+    align-content: center;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
