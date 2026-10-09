@@ -71,9 +71,9 @@ function hasWord(haystack, term) {
   return new RegExp(`(?<![a-z0-9])${escaped}(?:s|es)?(?![a-z0-9])`).test(haystack);
 }
 
-/** @param {Item} item @param {Filter} f */
+/** Terms match what a row shows: the title and the source word, not the unshown `where`. @param {Item} item @param {Filter} f */
 export function matches(item, f) {
-  const haystack = `${item.title}\n${item.where}`.toLowerCase();
+  const haystack = `${item.title}\n${sourceLabel(item)}`.toLowerCase();
   if (f.exclude.some((t) => hasWord(haystack, t))) return false;
   return f.include.length === 0 || f.include.some((t) => hasWord(haystack, t));
 }

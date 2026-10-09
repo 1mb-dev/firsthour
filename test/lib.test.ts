@@ -43,13 +43,20 @@ describe('filter', () => {
     expect(parseFilter(' Go, backend ,, -Onsite, - ')).toEqual({ include: ['go', 'backend'], exclude: ['onsite'] });
   });
 
-  it('matches whole words in title or where, any include, no exclude', () => {
+  it('matches whole words in the title or source word, any include, no exclude', () => {
     const f = parseFilter('go, rust, -onsite');
     expect(matches(item('1', 0, 'Acme | Go Engineer | Remote'), f)).toBe(true);
     expect(matches(item('2', 0, 'Acme | Google Ads | Remote'), f)).toBe(false);
     expect(matches(item('3', 0, 'Acme | Engineer | Chicago'), f)).toBe(false);
     expect(matches(item('4', 0, 'Acme | Rust | Remote or onsite'), f)).toBe(false);
-    expect(matches(item('5', 0, 'Acme | Engineer', 'Rust Co careers'), f)).toBe(true);
+  });
+
+  it('matches the source word a row shows, never the unshown where', () => {
+    const board = { ...item('1', 0, 'Acme | Engineer | Remote', 'Acme careers'), source: 'boards' as const };
+    expect(matches(board, parseFilter('board'))).toBe(true);
+    expect(matches(board, parseFilter('careers'))).toBe(false);
+    expect(matches(item('2', 0), parseFilter('-hiring'))).toBe(true);
+    expect(matches(item('3', 0), parseFilter('hn'))).toBe(true);
   });
 
   it('accepts a plural', () => {
