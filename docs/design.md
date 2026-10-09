@@ -1,6 +1,6 @@
 # Design
 
-firsthour is a logbook. Roles are entries stamped by age, and the page exists to show what arrived since you last looked. Time leads every row, unread entries carry full ink, and nothing a reader needs to decide is ever cut off.
+firsthour is a logbook: roles are entries stamped by age, and the page exists to show what arrived since you last looked.
 
 All values live in one token block at the top of `public/style.css`. `test/style.test.ts` fails on any color or length outside it.
 
@@ -36,24 +36,21 @@ Each color is written once as `light-dark(light, dark)`. The system theme picks 
 
 Every text token reads at 4.5:1 or better on paper in both themes, and the test pins it. Read rows use `--ink-2`, so dimming never drops below that floor.
 
-The palette is cool on purpose. The sibling sift is a warm cream reading desk, so no firsthour token sits within ΔE 5 (CIE76) of a sift token.
+The palette is cool on purpose: sift, the sibling HN reader, is warm cream. No firsthour token sits within ΔE 5 (CIE76) of a sift token.
 
 ## Rows
 
 ```
 desktop   age │ company │ role, then who may apply                    │ source
 mobile    age │ company                                               │ source
-                role, whole
+                role
 ```
 
-- **Age** leads: `12m`, `3h`, `2d`, mono with tabular figures.
-- **Company and role** come from the title's `Company | Role | …` convention (`parts` in `public/lib.js`). URLs are dropped from display, since the link is built from a validated id. HN job stories have no company part.
-- **Source** is one quiet word: `HN`, `HN jobs`, `board`.
-- **Nothing is truncated.** In HN titles the restriction ("US only", "visa possible") usually comes last, so rows wrap instead of cutting. Titles are capped at 160 characters upstream.
+Age leads, in mono with tabular figures: `12m`, `3h`, `2d`. Company and role come from the title's `Company | Role | …` convention (`parts` in `public/lib.js`); URLs are dropped from display because the link is built from a validated id, and HN job stories have no company part. The source is one word: `HN`, `HN jobs`, `board`. The filter matches company and role only.
+
+Rows wrap; they never truncate. In HN titles the restriction ("US only", "visa possible") usually comes last, which is what an ellipsis would hide. Titles are capped at 160 characters upstream. Touch screens get rows of at least 44 px; mouse rows stay dense.
 
 ## New and read
-
-Two signals, two facts:
 
 | Row | Means |
 |---|---|
@@ -66,7 +63,7 @@ Two signals, two facts:
 - A first visit has no baseline: no ticks, nothing dimmed.
 - A record from before reading was tracked loads as all read.
 - Screen readers get the word "new", which is visually hidden.
-- **First hour** is the only group header in signal color. It is the event the page is named for, and its one raised voice.
+- First hour is the only group header in signal color: it is the event the page is named for.
 
 ## Theme
 
@@ -77,7 +74,7 @@ Two signals, two facts:
 ## Rules
 
 - Tokens only: a new value is a new token.
-- Text is never cut. If a row needs more room, it wraps.
+- Rows wrap; text is never truncated.
 - Calm: a finite list with an end. No badges, no counters beyond the new count and the filter's "N of M", no animation.
 - Untrusted text is rendered with `textContent` only.
 
