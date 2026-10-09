@@ -6,7 +6,8 @@
  * @typedef {{ id: string, ok: boolean, fetched_at: string, error: string | null, count: number }} Status
  * @typedef {{ generated: string, stale: boolean, sources: Status[], next_thread: string, items: Item[] }} Posts
  * @typedef {{ include: string[], exclude: string[] }} Filter
- * @typedef {{ ids: Set<string>, at: string }} Seen
+ * @typedef {{ ids: Set<string>, read: Set<string>, at: string }} Seen ids listed last visit (arrival); read: rows that were on screen
+ * @typedef {'auto' | 'light' | 'dark'} Theme
  */
 
 const MINUTE = 60_000;
@@ -70,9 +71,14 @@ function hasWord(haystack, term) {
   return new RegExp(`(?<![a-z0-9])${escaped}(?:s|es)?(?![a-z0-9])`).test(haystack);
 }
 
-/** @param {Item} item @param {Filter} f */
+/**
+ * Terms match the row's content as shown: company and role. Not the dropped URLs, the unshown `where`,
+ * or the source word (`-hn` would also drop "HN jobs").
+ * @param {Item} item @param {Filter} f
+ */
 export function matches(item, f) {
-  const haystack = `${item.title}\n${item.where}`.toLowerCase();
+  const { company, role } = parts(item);
+  const haystack = `${company}\n${role}`.toLowerCase();
   if (f.exclude.some((t) => hasWord(haystack, t))) return false;
   return f.include.length === 0 || f.include.some((t) => hasWord(haystack, t));
 }
@@ -89,35 +95,100 @@ export function loadSeen(storage) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.ids) || typeof parsed.at !== 'string') return null;
-    return { ids: new Set(parsed.ids.filter((/** @type {unknown} */ id) => typeof id === 'string')), at: parsed.at };
+    const strings = (/** @type {unknown[]} */ list) => new Set(/** @type {string[]} */ (list.filter((id) => typeof id === 'string')));
+    const ids = strings(parsed.ids);
+    // A record from before `read` existed: count everything it listed as read, so nothing jumps back to full ink.
+    return { ids, read: Array.isArray(parsed.read) ? strings(parsed.read) : new Set(ids), at: parsed.at };
   } catch {
     return null;
   }
 }
 
 /**
- * Seen after this visit: what was seen before and is still listed, plus what was shown now.
- * Items hidden by the filter stay unseen, so they show as new when the filter changes.
- * @param {Seen | null} seen @param {string[]} listed @param {string[]} shown
+ * The record after this visit, pruned to what is still listed. `ids` (arrival): what was listed before plus what the
+ * filter showed now, so filtered-out items still arrive as new later. `read`: what was read before plus what was on
+ * screen now, so rows never scrolled to keep full ink.
+ * @param {Seen | null} seen @param {string[]} listed @param {string[]} shown @param {Iterable<string>} viewed
  */
-export function nextSeen(seen, listed, shown) {
+export function nextSeen(seen, listed, shown, viewed) {
   const ids = new Set(shown);
-  for (const id of listed) if (seen?.ids.has(id)) ids.add(id);
-  return [...ids];
+  const read = new Set(viewed);
+  for (const id of listed) {
+    if (seen?.ids.has(id)) ids.add(id);
+    if (seen?.read.has(id)) read.add(id);
+  }
+  return { ids: [...ids], read: [...read] };
 }
 
-/** @param {Pick<Storage, 'setItem'> | undefined} storage @param {string[]} ids @param {Date} at */
-export function saveSeen(storage, ids, at) {
+/** @param {Pick<Storage, 'setItem'> | undefined} storage @param {{ ids: string[], read: string[] }} next @param {Date} at */
+export function saveSeen(storage, next, at) {
   try {
-    storage?.setItem(SEEN_KEY, JSON.stringify({ ids, at: at.toISOString() }));
+    storage?.setItem(SEEN_KEY, JSON.stringify({ ...next, at: at.toISOString() }));
   } catch {
     // Private mode or full storage: markers just won't carry over.
   }
 }
 
-/** @param {Item} item @param {Seen | null} seen */
+const THEME_KEY = 'firsthour:theme';
+
+/** @param {Pick<Storage, 'getItem'> | undefined} storage @returns {Theme} */
+export function loadTheme(storage) {
+  try {
+    const theme = storage?.getItem(THEME_KEY);
+    return theme === 'light' || theme === 'dark' ? theme : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+
+/** Auto is the absence of a choice, so it clears the key. @param {Pick<Storage, 'setItem' | 'removeItem'> | undefined} storage @param {Theme} theme */
+export function saveTheme(storage, theme) {
+  try {
+    if (theme === 'auto') storage?.removeItem(THEME_KEY);
+    else storage?.setItem(THEME_KEY, theme);
+  } catch {
+    // Private mode or full storage: the choice lasts until reload.
+  }
+}
+
+/** Arrived since the last visit. A first visit has no baseline, so nothing is new. @param {Item} item @param {Seen | null} seen */
 export function isNew(item, seen) {
   return seen !== null && !seen.ids.has(item.id);
+}
+
+/** On screen during an earlier visit. A first visit has read nothing. @param {Item} item @param {Seen | null} seen */
+export function isRead(item, seen) {
+  return seen !== null && seen.read.has(item.id);
+}
+
+// A URL or bare `www.` host, with its wrapping parens, the closing one possibly lost to the 160-char title cap.
+// A paren that closes surrounding text stays, so "(listed here https://x)" keeps its ")".
+const URLISH = /\((?:https?:|www\.)[^\s)]*\)?|\b(?:https?:|www\.)[^\s)]*/gi;
+// The cap can also cut a URL before its colon: "(http…", "ww…".
+const CUT_URL = /\s*\(?\b(?:h(?:t(?:t(?:ps?)?)?)?|w{1,3})…$/i;
+const EDGES = /^[\s,;:·-]+|[\s,;:·-]+$/g;
+
+/**
+ * Display split of an untrusted title on the `Company | Role | ...` convention, URLs dropped.
+ * HN job stories and titles without a pipe have no company part. Text only: callers render with textContent.
+ * @param {Item} item @returns {{ company: string, role: string }}
+ */
+export function parts(item) {
+  const segs = item.title
+    .split('|')
+    .map((s) => s.replace(URLISH, '').replace(CUT_URL, '').replace(/\s+/g, ' ').replace(/ \)/g, ')').replace(EDGES, ''));
+  const kept = segs.filter(Boolean);
+  if (kept.length === 0) return { company: '', role: item.title };
+  if (item.source === 'yc' || segs.length < 2) return { company: '', role: kept.join(' · ') };
+  // Positions hold: a first segment that was only a URL leaves the company empty rather than promoting the role.
+  return { company: segs[0] ?? '', role: segs.slice(1).filter(Boolean).join(' · ') };
+}
+
+const SOURCES = { hn: 'HN', yc: 'HN jobs', boards: 'board' };
+
+/** @param {Item} item */
+export function sourceLabel(item) {
+  return SOURCES[item.source] ?? item.source;
 }
 
 const NAMES = { hn: 'HN', yc: 'HN jobs', boards: 'Boards' };

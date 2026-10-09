@@ -26,6 +26,8 @@ describe('worker', () => {
     const res = await worker.fetch(new Request('https://firsthour.1mb.dev/') as never, env, ctx);
     expect(res.headers.get('content-type')).toBe('text/html');
     expect(res.headers.get('content-security-policy')).toContain("default-src 'none'");
+    // Without font-src, default-src 'none' blocks the page's own font, and only the console says so.
+    expect(res.headers.get('content-security-policy')).toContain("font-src 'self'");
   });
 
   const body: PostsBody = { generated: '2026-10-07T16:00:00Z', stale: false, sources: [], next_thread: '2026-11-02T16:00:00Z', items: [] };

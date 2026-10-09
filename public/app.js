@@ -1,5 +1,5 @@
 // @ts-check
-import { age, allDown, group, isActive, isNew, loadSeen, matches, nextSeen, parseFilter, saveSeen, statusText } from './lib.js';
+import { age, allDown, group, isActive, isNew, isRead, loadSeen, loadTheme, matches, nextSeen, parseFilter, parts, saveSeen, saveTheme, sourceLabel, statusText } from './lib.js';
 
 /** @typedef {import('./lib.js').Posts} Posts */
 
@@ -26,6 +26,19 @@ const seen = loadSeen(storage());
 let posts = null;
 /** @type {string[]} */
 let shown = [];
+/** Ids whose row was on screen during this visit. @type {Set<string>} */
+const viewed = new Set();
+const onScreen = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      const id = entry.target instanceof HTMLElement ? entry.target.dataset.id : undefined;
+      if (!entry.isIntersecting || !id) continue;
+      viewed.add(id);
+      onScreen.unobserve(entry.target);
+    }
+  },
+  { threshold: 0.6 },
+);
 
 /**
  * @param {string} tag
@@ -67,12 +80,10 @@ function render() {
   renderStatus(posts);
 
   const fresh = visible.filter((item) => isNew(item, seen)).length;
-  count.textContent = [
-    isActive(filter) ? `${visible.length} of ${posts.items.length}` : '',
-    seen && fresh > 0 ? `${fresh} new since ${dateTimeFmt.format(new Date(seen.at))}` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  count.replaceChildren(
+    ...(isActive(filter) ? [el('span', { text: `${visible.length} of ${posts.items.length}` })] : []),
+    ...(seen && fresh > 0 ? [el('span', { class: 'new-count', text: `${fresh} new since ${dateTimeFmt.format(new Date(seen.at))}` })] : []),
+  );
 
   if (allDown(posts)) {
     list.replaceChildren(el('p', { class: 'empty', text: 'Every source is unavailable right now.' }), retryButton());
@@ -96,29 +107,32 @@ function render() {
   list.replaceChildren(
     ...(groups[0]?.label === 'First hour' ? [] : [nextThreadLine(posts)]),
     ...groups.map((g) =>
-      el('section', {}, [
+      el('section', { class: g.label === 'First hour' ? 'first' : '' }, [
         el('h2', { text: g.label }),
         el(
           'ol',
           {},
-          g.items.map((item) =>
-            el('li', {}, [
-              el('a', { class: isNew(item, seen) ? 'row new' : 'row', href: item.url }, [
-                el('span', { class: 'age', text: age(item.posted_at, now) }),
-                el('span', { class: 'body' }, [
-                  el('span', { class: 'where' }, [
-                    el('span', { text: item.where }),
-                    isNew(item, seen) ? el('span', { class: 'mark', text: 'new' }) : null,
-                  ]),
-                  el('span', { class: 'title', text: item.title }),
-                ]),
-              ]),
-            ]),
-          ),
+          g.items.map((item) => el('li', {}, [row(item, now)])),
         ),
       ]),
     ),
   );
+  onScreen.disconnect();
+  for (const node of list.querySelectorAll('.row')) onScreen.observe(node);
+}
+
+/** @param {import('./lib.js').Item} item @param {number} now */
+function row(item, now) {
+  const fresh = isNew(item, seen);
+  const { company, role } = parts(item);
+  const a = el('a', { class: ['row', fresh ? 'new' : '', isRead(item, seen) ? 'read' : ''].filter(Boolean).join(' '), href: item.url }, [
+    el('span', { class: 'age' }, [el('span', { text: age(item.posted_at, now) }), fresh ? el('span', { class: 'mark', text: 'new' }) : null]),
+    el('span', { class: 'co', text: company }),
+    el('span', { class: 'role', text: role }),
+    el('span', { class: 'src', text: sourceLabel(item) }),
+  ]);
+  a.dataset.id = item.id;
+  return a;
 }
 
 /** @param {Posts} p */
@@ -155,8 +169,27 @@ function onFilter() {
 }
 
 function markSeen() {
-  if (posts) saveSeen(storage(), nextSeen(seen, posts.items.map((item) => item.id), shown), new Date());
+  if (posts) saveSeen(storage(), nextSeen(seen, posts.items.map((item) => item.id), shown, viewed), new Date());
 }
+
+const themeButtons = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('[data-theme-choice]'));
+
+/** @param {import('./lib.js').Theme} theme */
+function applyTheme(theme) {
+  if (theme === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  for (const button of themeButtons) button.setAttribute('aria-pressed', String(button.dataset.themeChoice === theme));
+}
+
+for (const button of themeButtons) {
+  button.addEventListener('click', () => {
+    const theme = button.dataset.themeChoice;
+    if (theme !== 'auto' && theme !== 'light' && theme !== 'dark') return;
+    saveTheme(storage(), theme);
+    applyTheme(theme);
+  });
+}
+applyTheme(loadTheme(storage()));
 
 input.value = new URL(location.href).searchParams.get('q') ?? '';
 input.addEventListener('input', onFilter);
