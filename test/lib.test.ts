@@ -135,6 +135,7 @@ describe('parts', () => {
     ['Acme | www.acme.example | Remote', { company: 'Acme', role: 'Remote' }],
     ['Acme | Staff Engineer | Remote | https:…', { company: 'Acme', role: 'Staff Engineer · Remote' }],
     ['Acme | Node.js Engineer | Remote', { company: 'Acme', role: 'Node.js Engineer · Remote' }],
+    ['Acme | REMOTE in select countries (listed here https://wiki.example/p/a_9) | $181K', { company: 'Acme', role: 'REMOTE in select countries (listed here) · $181K' }],
     ['Software Engineer — Remote — US Only', { company: '', role: 'Software Engineer — Remote — US Only' }],
   ])('%s', (title, expected) => {
     expect(parts(hn(title))).toEqual(expected);

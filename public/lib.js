@@ -143,8 +143,9 @@ export function isNew(item, seen) {
   return seen !== null && !seen.ids.has(item.id);
 }
 
-// A URL, bare `www.` host, or one cut short by the 160-char title cap ("https:…"), with any wrapping parens.
-const URLISH = /\(?\b(?:https?:\S*|www\.\S+?)\)?(?=\s|$)/gi;
+// A URL, bare `www.` host, or one cut short by the 160-char title cap ("https:…"). Wrapping parens go with it;
+// a paren that closes surrounding text stays, so "(listed here https://x)" keeps its ")".
+const URLISH = /\((?:https?:|www\.)[^\s)]*\)|\b(?:https?:|www\.)[^\s)]*/gi;
 const EDGES = /^[\s,;:·-]+|[\s,;:·-]+$/g;
 
 /**
@@ -155,7 +156,7 @@ const EDGES = /^[\s,;:·-]+|[\s,;:·-]+$/g;
 export function parts(item) {
   const segs = item.title
     .split('|')
-    .map((s) => s.replace(URLISH, '').replace(/\s+/g, ' ').replace(EDGES, ''))
+    .map((s) => s.replace(URLISH, '').replace(/\s+/g, ' ').replace(/ \)/g, ')').replace(EDGES, ''))
     .filter(Boolean);
   if (segs.length === 0) return { company: '', role: item.title };
   if (item.source === 'yc' || segs.length < 2) return { company: '', role: segs.join(' · ') };
