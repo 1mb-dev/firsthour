@@ -187,7 +187,7 @@ input[type='search']::placeholder {
   content: ' · ';
 }
 
-/* The key for new rows: the same tick they carry. */
+/* Same tick as .new rows: change both together. */
 .new-count::before {
   content: '';
   display: inline-block;
@@ -225,7 +225,6 @@ h2::after {
   border-top: var(--hair) solid var(--rule-strong);
 }
 
-/* First hour is the event the page is named for: its one raised voice. */
 .first h2 {
   color: var(--signal);
 }
@@ -244,7 +243,7 @@ li + li {
   border-top: var(--hair) solid var(--rule);
 }
 
-/* Seen rows recede; unseen rows keep full ink. Company and role always show whole: who may apply often comes last. */
+/* Never clip company or role (no nowrap, no ellipsis): who may apply often comes last. */
 .row {
   display: grid;
   grid-template-columns: var(--col-age) var(--col-co) 1fr var(--col-src);
