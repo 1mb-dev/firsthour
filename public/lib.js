@@ -96,12 +96,12 @@ export function loadSeen(storage) {
 }
 
 /**
- * Seen after this visit: what was seen before and is still listed, plus what was shown now.
- * Items hidden by the filter stay unseen, so they show as new when the filter changes.
- * @param {Seen | null} seen @param {string[]} listed @param {string[]} shown
+ * Seen after this visit: what was seen before and is still listed, plus what was on screen now.
+ * Rows never scrolled to, or hidden by the filter, stay unseen and keep full ink next visit.
+ * @param {Seen | null} seen @param {string[]} listed @param {Iterable<string>} viewed
  */
-export function nextSeen(seen, listed, shown) {
-  const ids = new Set(shown);
+export function nextSeen(seen, listed, viewed) {
+  const ids = new Set(viewed);
   for (const id of listed) if (seen?.ids.has(id)) ids.add(id);
   return [...ids];
 }

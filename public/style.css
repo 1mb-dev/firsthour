@@ -140,6 +140,15 @@ li + li {
   text-decoration: none;
 }
 
+.row {
+  color: var(--muted);
+}
+
+.row:hover,
+.new {
+  color: var(--fg);
+}
+
 .row:hover .role {
   text-decoration: underline;
 }

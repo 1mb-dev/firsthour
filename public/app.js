@@ -24,8 +24,19 @@ function storage() {
 const seen = loadSeen(storage());
 /** @type {Posts | null} */
 let posts = null;
-/** @type {string[]} */
-let shown = [];
+/** Ids whose row was on screen during this visit. @type {Set<string>} */
+const viewed = new Set();
+const onScreen = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      const id = entry.target instanceof HTMLElement ? entry.target.dataset.id : undefined;
+      if (!entry.isIntersecting || !id) continue;
+      viewed.add(id);
+      onScreen.unobserve(entry.target);
+    }
+  },
+  { threshold: 0.6 },
+);
 
 /**
  * @param {string} tag
@@ -63,7 +74,6 @@ function render() {
   const now = Date.now();
   const filter = parseFilter(input.value);
   const visible = posts.items.filter((item) => matches(item, filter));
-  shown = visible.map((item) => item.id);
   renderStatus(posts);
 
   const fresh = visible.filter((item) => isNew(item, seen)).length;
@@ -106,18 +116,22 @@ function render() {
       ]),
     ),
   );
+  onScreen.disconnect();
+  for (const node of list.querySelectorAll('.row')) onScreen.observe(node);
 }
 
 /** @param {import('./lib.js').Item} item @param {number} now */
 function row(item, now) {
   const fresh = isNew(item, seen);
   const { company, role } = parts(item);
-  return el('a', { class: fresh ? 'row new' : 'row', href: item.url }, [
+  const a = el('a', { class: fresh ? 'row new' : 'row', href: item.url }, [
     el('span', { class: 'age' }, [el('span', { text: age(item.posted_at, now) }), fresh ? el('span', { class: 'mark', text: 'new' }) : null]),
     el('span', { class: 'co', text: company }),
     el('span', { class: 'role', text: role }),
     el('span', { class: 'src', text: sourceLabel(item) }),
   ]);
+  a.dataset.id = item.id;
+  return a;
 }
 
 /** @param {Posts} p */
@@ -154,7 +168,7 @@ function onFilter() {
 }
 
 function markSeen() {
-  if (posts) saveSeen(storage(), nextSeen(seen, posts.items.map((item) => item.id), shown), new Date());
+  if (posts) saveSeen(storage(), nextSeen(seen, posts.items.map((item) => item.id), viewed), new Date());
 }
 
 input.value = new URL(location.href).searchParams.get('q') ?? '';
