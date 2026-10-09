@@ -43,7 +43,7 @@ describe('filter', () => {
     expect(parseFilter(' Go, backend ,, -Onsite, - ')).toEqual({ include: ['go', 'backend'], exclude: ['onsite'] });
   });
 
-  it('matches whole words in the title or source word, any include, no exclude', () => {
+  it('matches whole words in company or role, any include, no exclude', () => {
     const f = parseFilter('go, rust, -onsite');
     expect(matches(item('1', 0, 'Acme | Go Engineer | Remote'), f)).toBe(true);
     expect(matches(item('2', 0, 'Acme | Google Ads | Remote'), f)).toBe(false);
@@ -51,12 +51,14 @@ describe('filter', () => {
     expect(matches(item('4', 0, 'Acme | Rust | Remote or onsite'), f)).toBe(false);
   });
 
-  it('matches the source word a row shows, never the unshown where', () => {
+  it('never matches text a row does not show: URLs, where, or the source word', () => {
     const board = { ...item('1', 0, 'Acme | Engineer | Remote', 'Acme careers'), source: 'boards' as const };
-    expect(matches(board, parseFilter('board'))).toBe(true);
+    expect(matches(board, parseFilter('board'))).toBe(false);
     expect(matches(board, parseFilter('careers'))).toBe(false);
     expect(matches(item('2', 0), parseFilter('-hiring'))).toBe(true);
-    expect(matches(item('3', 0), parseFilter('hn'))).toBe(true);
+    expect(matches(item('3', 0, 'Acme | Engineer | Remote | https://jobs.lever.co/acme'), parseFilter('-lever'))).toBe(true);
+    const story = { ...item('4', 0, 'Acme (YC W22) is hiring a backend engineer', 'HN jobs'), source: 'yc' as const };
+    expect(matches(story, parseFilter('-hn'))).toBe(true);
   });
 
   it('accepts a plural', () => {

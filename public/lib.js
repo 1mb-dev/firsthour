@@ -71,9 +71,14 @@ function hasWord(haystack, term) {
   return new RegExp(`(?<![a-z0-9])${escaped}(?:s|es)?(?![a-z0-9])`).test(haystack);
 }
 
-/** Terms match what a row shows: the title and the source word, not the unshown `where`. @param {Item} item @param {Filter} f */
+/**
+ * Terms match the row's content as shown: company and role. Not the dropped URLs, the unshown `where`,
+ * or the source word (`-hn` would also drop "HN jobs").
+ * @param {Item} item @param {Filter} f
+ */
 export function matches(item, f) {
-  const haystack = `${item.title}\n${sourceLabel(item)}`.toLowerCase();
+  const { company, role } = parts(item);
+  const haystack = `${company}\n${role}`.toLowerCase();
   if (f.exclude.some((t) => hasWord(haystack, t))) return false;
   return f.include.length === 0 || f.include.some((t) => hasWord(haystack, t));
 }
