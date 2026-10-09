@@ -164,6 +164,7 @@ describe('parts', () => {
     ['Acme | Engineer | REMOTE (http…', { company: 'Acme', role: 'Engineer · REMOTE' }],
     ['Acme | Engineer | REMOTE ww…', { company: 'Acme', role: 'Engineer · REMOTE' }],
     ['Acme | Engineer | Hybrid…', { company: 'Acme', role: 'Engineer · Hybrid…' }],
+    ['www.acme.io | Senior Go Engineer | Remote', { company: '', role: 'Senior Go Engineer · Remote' }],
     ['Acme | Node.js Engineer | Remote', { company: 'Acme', role: 'Node.js Engineer · Remote' }],
     ['Acme | REMOTE in select countries (listed here https://wiki.example/p/a_9) | $181K', { company: 'Acme', role: 'REMOTE in select countries (listed here) · $181K' }],
     ['Software Engineer — Remote — US Only', { company: '', role: 'Software Engineer — Remote — US Only' }],

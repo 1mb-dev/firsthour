@@ -176,11 +176,12 @@ const EDGES = /^[\s,;:·-]+|[\s,;:·-]+$/g;
 export function parts(item) {
   const segs = item.title
     .split('|')
-    .map((s) => s.replace(URLISH, '').replace(CUT_URL, '').replace(/\s+/g, ' ').replace(/ \)/g, ')').replace(EDGES, ''))
-    .filter(Boolean);
-  if (segs.length === 0) return { company: '', role: item.title };
-  if (item.source === 'yc' || segs.length < 2) return { company: '', role: segs.join(' · ') };
-  return { company: segs[0] ?? '', role: segs.slice(1).join(' · ') };
+    .map((s) => s.replace(URLISH, '').replace(CUT_URL, '').replace(/\s+/g, ' ').replace(/ \)/g, ')').replace(EDGES, ''));
+  const kept = segs.filter(Boolean);
+  if (kept.length === 0) return { company: '', role: item.title };
+  if (item.source === 'yc' || segs.length < 2) return { company: '', role: kept.join(' · ') };
+  // Positions hold: a first segment that was only a URL leaves the company empty rather than promoting the role.
+  return { company: segs[0] ?? '', role: segs.slice(1).filter(Boolean).join(' · ') };
 }
 
 const SOURCES = { hn: 'HN', yc: 'HN jobs', boards: 'board' };
