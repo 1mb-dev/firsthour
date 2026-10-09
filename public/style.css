@@ -183,8 +183,12 @@ input[type='search']::placeholder {
   display: none;
 }
 
+.count > span:not(:last-child)::after {
+  content: ' · ';
+}
+
 /* The key for new rows: the same tick they carry. */
-.count.has-new::before {
+.new-count::before {
   content: '';
   display: inline-block;
   width: var(--tick);

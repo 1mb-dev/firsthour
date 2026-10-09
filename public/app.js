@@ -80,13 +80,10 @@ function render() {
   renderStatus(posts);
 
   const fresh = visible.filter((item) => isNew(item, seen)).length;
-  count.textContent = [
-    isActive(filter) ? `${visible.length} of ${posts.items.length}` : '',
-    seen && fresh > 0 ? `${fresh} new since ${dateTimeFmt.format(new Date(seen.at))}` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  count.classList.toggle('has-new', Boolean(seen && fresh > 0));
+  count.replaceChildren(
+    ...(isActive(filter) ? [el('span', { text: `${visible.length} of ${posts.items.length}` })] : []),
+    ...(seen && fresh > 0 ? [el('span', { class: 'new-count', text: `${fresh} new since ${dateTimeFmt.format(new Date(seen.at))}` })] : []),
+  );
 
   if (allDown(posts)) {
     list.replaceChildren(el('p', { class: 'empty', text: 'Every source is unavailable right now.' }), retryButton());
