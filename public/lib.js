@@ -120,6 +120,32 @@ export function isNew(item, seen) {
   return seen !== null && !seen.ids.has(item.id);
 }
 
+// A URL, bare `www.` host, or one cut short by the 160-char title cap ("https:…"), with any wrapping parens.
+const URLISH = /\(?\b(?:https?:\S*|www\.\S+?)\)?(?=\s|$)/gi;
+const EDGES = /^[\s,;:·-]+|[\s,;:·-]+$/g;
+
+/**
+ * Display split of an untrusted title on the `Company | Role | ...` convention, URLs dropped.
+ * HN job stories and titles without a pipe have no company part. Text only: callers render with textContent.
+ * @param {Item} item @returns {{ company: string, role: string }}
+ */
+export function parts(item) {
+  const segs = item.title
+    .split('|')
+    .map((s) => s.replace(URLISH, '').replace(/\s+/g, ' ').replace(EDGES, ''))
+    .filter(Boolean);
+  if (segs.length === 0) return { company: '', role: item.title };
+  if (item.source === 'yc' || segs.length < 2) return { company: '', role: segs.join(' · ') };
+  return { company: segs[0] ?? '', role: segs.slice(1).join(' · ') };
+}
+
+const SOURCES = { hn: 'HN', yc: 'HN jobs', boards: 'board' };
+
+/** @param {Item} item */
+export function sourceLabel(item) {
+  return SOURCES[item.source] ?? item.source;
+}
+
 const NAMES = { hn: 'HN', yc: 'HN jobs', boards: 'Boards' };
 
 /** @param {Status} s @param {(iso: string) => string} time */

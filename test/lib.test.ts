@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { age, allDown, group, isNew, loadSeen, matches, nextSeen, parseFilter, saveSeen, statusText } from '../public/lib.js';
+import { age, allDown, group, isNew, loadSeen, matches, nextSeen, parseFilter, parts, saveSeen, sourceLabel, statusText } from '../public/lib.js';
 
 const NOW = Date.parse('2026-10-07T16:00:00Z');
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
@@ -121,5 +121,39 @@ describe('status', () => {
     expect(allDown(base)).toBe(true);
     expect(allDown({ ...base, items: [item('a', 0)] })).toBe(false);
     expect(allDown({ ...base, sources: [{ ...down, ok: true }] })).toBe(false);
+  });
+});
+
+describe('parts', () => {
+  const hn = (title: string, source: 'hn' | 'yc' | 'boards' = 'hn') => ({ ...item('x', MIN, title), source });
+  it.each([
+    ['Acme | Backend Engineer | Remote', { company: 'Acme', role: 'Backend Engineer · Remote' }],
+    ['Acme|Backend Engineer|REMOTE (US)', { company: 'Acme', role: 'Backend Engineer · REMOTE (US)' }],
+    ['Acme | https://acme.example/jobs | REMOTE (US) | Full Time', { company: 'Acme', role: 'REMOTE (US) · Full Time' }],
+    ['Acme (https://acme.example) | Go Engineer', { company: 'Acme', role: 'Go Engineer' }],
+    ['Acme | www.acme.example | Remote', { company: 'Acme', role: 'Remote' }],
+    ['Acme | Staff Engineer | Remote | https:…', { company: 'Acme', role: 'Staff Engineer · Remote' }],
+    ['Acme | Node.js Engineer | Remote', { company: 'Acme', role: 'Node.js Engineer · Remote' }],
+    ['Software Engineer — Remote — US Only', { company: '', role: 'Software Engineer — Remote — US Only' }],
+  ])('%s', (title, expected) => {
+    expect(parts(hn(title))).toEqual(expected);
+  });
+
+  it('gives HN job stories no company part', () => {
+    expect(parts(hn('Acme (YC W22) | is hiring a backend engineer', 'yc'))).toEqual({ company: '', role: 'Acme (YC W22) · is hiring a backend engineer' });
+  });
+
+  it('keeps the raw title when nothing but URLs is left', () => {
+    expect(parts(hn('https://acme.example'))).toEqual({ company: '', role: 'https://acme.example' });
+  });
+});
+
+describe('sourceLabel', () => {
+  it.each([
+    ['hn', 'HN'],
+    ['yc', 'HN jobs'],
+    ['boards', 'board'],
+  ] as const)('%s -> %s', (source, label) => {
+    expect(sourceLabel({ ...item('x', MIN), source })).toBe(label);
   });
 });

@@ -1,5 +1,5 @@
 // @ts-check
-import { age, allDown, group, isActive, isNew, loadSeen, matches, nextSeen, parseFilter, saveSeen, statusText } from './lib.js';
+import { age, allDown, group, isActive, isNew, loadSeen, matches, nextSeen, parseFilter, parts, saveSeen, sourceLabel, statusText } from './lib.js';
 
 /** @typedef {import('./lib.js').Posts} Posts */
 
@@ -101,24 +101,23 @@ function render() {
         el(
           'ol',
           {},
-          g.items.map((item) =>
-            el('li', {}, [
-              el('a', { class: isNew(item, seen) ? 'row new' : 'row', href: item.url }, [
-                el('span', { class: 'age', text: age(item.posted_at, now) }),
-                el('span', { class: 'body' }, [
-                  el('span', { class: 'where' }, [
-                    el('span', { text: item.where }),
-                    isNew(item, seen) ? el('span', { class: 'mark', text: 'new' }) : null,
-                  ]),
-                  el('span', { class: 'title', text: item.title }),
-                ]),
-              ]),
-            ]),
-          ),
+          g.items.map((item) => el('li', {}, [row(item, now)])),
         ),
       ]),
     ),
   );
+}
+
+/** @param {import('./lib.js').Item} item @param {number} now */
+function row(item, now) {
+  const fresh = isNew(item, seen);
+  const { company, role } = parts(item);
+  return el('a', { class: fresh ? 'row new' : 'row', href: item.url }, [
+    el('span', { class: 'age' }, [el('span', { text: age(item.posted_at, now) }), fresh ? el('span', { class: 'mark', text: 'new' }) : null]),
+    el('span', { class: 'co', text: company }),
+    el('span', { class: 'role', text: role }),
+    el('span', { class: 'src', text: sourceLabel(item) }),
+  ]);
 }
 
 /** @param {Posts} p */

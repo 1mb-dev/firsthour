@@ -132,18 +132,20 @@ li + li {
 
 .row {
   display: grid;
-  grid-template-columns: 3.25rem 1fr;
-  gap: 0.75rem;
+  grid-template-columns: 3.25rem 1fr auto;
+  grid-template-areas: 'age co src' 'age role role';
+  column-gap: 0.75rem;
   min-height: 44px;
   padding: 0.65rem 0;
   text-decoration: none;
 }
 
-.row:hover .title {
+.row:hover .role {
   text-decoration: underline;
 }
 
 .age {
+  grid-area: age;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
@@ -153,26 +155,26 @@ li + li {
   font-weight: 600;
 }
 
-.body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+.co {
+  grid-area: co;
+  font-weight: 600;
 }
 
-.where {
-  display: flex;
-  gap: 0.5rem;
+.role {
+  grid-area: role;
+  overflow-wrap: anywhere;
+}
+
+.src {
+  grid-area: src;
   font-size: 0.85rem;
   color: var(--muted);
 }
 
 .mark {
+  margin-left: 0.5rem;
   color: var(--accent);
   font-weight: 600;
-}
-
-.title {
-  overflow-wrap: anywhere;
 }
 
 .empty {
