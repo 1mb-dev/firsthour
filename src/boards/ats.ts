@@ -104,6 +104,13 @@ const PARSERS: Record<Platform, (json: unknown) => Job[]> = {
   lever: leverJobs,
 };
 
+/** The ATS says remote but the location only names a place ("New York"): say so, or the row reads as onsite. */
+function placeLabel(job: Job): string {
+  const location = job.location.trim();
+  if (job.remote !== true || /\bremote\b/i.test(location)) return location;
+  return location ? `Remote (${location})` : 'Remote';
+}
+
 export function parseBoard(board: Board, json: unknown): Candidate[] {
   const posts: Candidate[] = [];
   for (const job of PARSERS[board.platform](json)) {
@@ -113,7 +120,7 @@ export function parseBoard(board: Board, json: unknown): Candidate[] {
       id: `boards:${board.platform}:${board.slug}:${job.id}`,
       source: 'boards',
       where: `${board.company} careers`,
-      title: [board.company, job.title.trim(), job.location.trim()].filter(Boolean).join(' | '),
+      title: [board.company, job.title.trim(), placeLabel(job)].filter(Boolean).join(' | '),
       posted_at: job.posted_at,
       url,
       body: job.body,

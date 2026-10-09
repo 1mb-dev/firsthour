@@ -135,6 +135,22 @@ describe('ATS parsers', () => {
     expect(posts[0]?.posted_at).toBe('2026-10-01T00:00:00.000Z');
   });
 
+  it('labels a remote job whose location only names a place, and leaves the rest as given', () => {
+    const at = '2026-10-01T00:00:00Z';
+    const ashby = parseBoard(board('ashby'), {
+      jobs: [
+        { id: UUID, title: 'A', location: 'New York', publishedAt: at, workplaceType: 'Remote' },
+        { id: UUID.replace('0', '1'), title: 'B', publishedAt: at, isRemote: true },
+        { id: UUID.replace('0', '2'), title: 'C', location: 'Remote, US', publishedAt: at, workplaceType: 'Remote' },
+        { id: UUID.replace('0', '3'), title: 'D', location: 'NYC', publishedAt: at, isRemote: true, workplaceType: 'Hybrid' },
+      ],
+    });
+    const company = board('ashby').company;
+    expect(ashby.map((p) => p.title)).toEqual([`${company} | A | Remote (New York)`, `${company} | B | Remote`, `${company} | C | Remote, US`, `${company} | D | NYC`]);
+    const lever = parseBoard(board('lever'), [{ id: UUID, text: 'A', createdAt: Date.parse(at), workplaceType: 'remote', categories: { location: 'Berlin' } }]);
+    expect(lever[0]?.title).toBe(`${board('lever').company} | A | Remote (Berlin)`);
+  });
+
   it('drops jobs whose id cannot build a safe url', () => {
     const json = { jobs: [{ id: 'not-a-uuid', title: 'A', publishedAt: '2026-10-01T00:00:00Z', workplaceType: 'Remote' }] };
     expect(parseBoard(board('ashby'), json)).toEqual([]);
