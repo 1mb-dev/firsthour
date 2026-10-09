@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { age, allDown, group, isNew, loadSeen, matches, nextSeen, parseFilter, parts, saveSeen, sourceLabel, statusText } from '../public/lib.js';
+import { readFileSync } from 'node:fs';
+import { age, allDown, group, isNew, loadSeen, loadTheme, matches, nextSeen, parseFilter, parts, saveSeen, saveTheme, sourceLabel, statusText } from '../public/lib.js';
 
 const NOW = Date.parse('2026-10-07T16:00:00Z');
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
@@ -155,5 +156,65 @@ describe('sourceLabel', () => {
     ['boards', 'board'],
   ] as const)('%s -> %s', (source, label) => {
     expect(sourceLabel({ ...item('x', MIN), source })).toBe(label);
+  });
+});
+
+describe('theme', () => {
+  const memory = () => {
+    const data = new Map<string, string>();
+    return {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+      removeItem: (k: string) => void data.delete(k),
+    };
+  };
+  const broken = {
+    getItem: () => {
+      throw new Error('denied');
+    },
+    setItem: () => {
+      throw new Error('denied');
+    },
+    removeItem: () => {
+      throw new Error('denied');
+    },
+  };
+
+  it('round-trips a choice; auto clears it', () => {
+    const storage = memory();
+    expect(loadTheme(storage)).toBe('auto');
+    saveTheme(storage, 'dark');
+    expect(loadTheme(storage)).toBe('dark');
+    saveTheme(storage, 'auto');
+    expect(storage.getItem('firsthour:theme')).toBeNull();
+    expect(loadTheme(storage)).toBe('auto');
+  });
+
+  it('falls back to auto on blocked storage or an unknown value', () => {
+    expect(loadTheme(broken)).toBe('auto');
+    expect(() => saveTheme(broken, 'light')).not.toThrow();
+    expect(loadTheme(undefined)).toBe('auto');
+    const storage = memory();
+    storage.setItem('firsthour:theme', 'sepia');
+    expect(loadTheme(storage)).toBe('auto');
+  });
+
+  // theme.js is a classic script (it must run before first paint), so it cannot import lib.js.
+  it('theme.js applies what saveTheme stored, and nothing else', () => {
+    const source = readFileSync(new URL('../public/theme.js', import.meta.url), 'utf8');
+    const run = (storage: unknown) => {
+      const documentElement = { dataset: {} as Record<string, string> };
+      new Function('localStorage', 'document', source)(storage, { documentElement });
+      return documentElement.dataset.theme;
+    };
+    for (const theme of ['light', 'dark'] as const) {
+      const storage = memory();
+      saveTheme(storage, theme);
+      expect(run(storage)).toBe(theme);
+    }
+    const storage = memory();
+    storage.setItem('firsthour:theme', 'sepia');
+    expect(run(storage)).toBeUndefined();
+    expect(run(broken)).toBeUndefined();
   });
 });

@@ -1,5 +1,5 @@
 // @ts-check
-import { age, allDown, group, isActive, isNew, loadSeen, matches, nextSeen, parseFilter, parts, saveSeen, sourceLabel, statusText } from './lib.js';
+import { age, allDown, group, isActive, isNew, loadSeen, loadTheme, matches, nextSeen, parseFilter, parts, saveSeen, saveTheme, sourceLabel, statusText } from './lib.js';
 
 /** @typedef {import('./lib.js').Posts} Posts */
 
@@ -170,6 +170,25 @@ function onFilter() {
 function markSeen() {
   if (posts) saveSeen(storage(), nextSeen(seen, posts.items.map((item) => item.id), viewed), new Date());
 }
+
+const themeButtons = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('[data-theme-choice]'));
+
+/** @param {import('./lib.js').Theme} theme */
+function applyTheme(theme) {
+  if (theme === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  for (const button of themeButtons) button.setAttribute('aria-pressed', String(button.dataset.themeChoice === theme));
+}
+
+for (const button of themeButtons) {
+  button.addEventListener('click', () => {
+    const theme = button.dataset.themeChoice;
+    if (theme !== 'auto' && theme !== 'light' && theme !== 'dark') return;
+    saveTheme(storage(), theme);
+    applyTheme(theme);
+  });
+}
+applyTheme(loadTheme(storage()));
 
 input.value = new URL(location.href).searchParams.get('q') ?? '';
 input.addEventListener('input', onFilter);

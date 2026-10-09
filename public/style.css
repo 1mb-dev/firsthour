@@ -22,7 +22,12 @@
   }
 }
 
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
 :root[data-theme='dark'] {
+  color-scheme: dark;
   --bg: #15171a;
   --fg: #e8e6e3;
   --muted: #9aa0a6;
@@ -89,6 +94,28 @@ footer {
   margin: 0.75rem 0 0;
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+.theme {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.theme button {
+  min-height: 44px;
+  padding: 0 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.theme button[aria-pressed='true'] {
+  color: var(--fg);
+  text-decoration: underline;
 }
 
 .warn {

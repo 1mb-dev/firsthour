@@ -7,6 +7,7 @@
     <meta name="description" content="Fresh remote roles from Hacker News and the companies hiring there, while they are still new." />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script src="/theme.js"></script>
     <link rel="stylesheet" href="/style.css" />
     <script type="module" src="/app.js"></script>
   </head>
@@ -15,6 +16,11 @@
       <h1>firsthour</h1>
       <p class="tagline">Fresh remote roles from Hacker News and the companies hiring there.</p>
       <p id="status" class="status" aria-live="polite"></p>
+      <nav class="theme" aria-label="Theme">
+        <button type="button" data-theme-choice="auto">auto</button>
+        <button type="button" data-theme-choice="light">light</button>
+        <button type="button" data-theme-choice="dark">dark</button>
+      </nav>
     </header>
     <main>
       <label for="q" class="visually-hidden">Filter</label>

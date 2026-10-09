@@ -7,6 +7,7 @@
  * @typedef {{ generated: string, stale: boolean, sources: Status[], next_thread: string, items: Item[] }} Posts
  * @typedef {{ include: string[], exclude: string[] }} Filter
  * @typedef {{ ids: Set<string>, at: string }} Seen
+ * @typedef {'auto' | 'light' | 'dark'} Theme
  */
 
 const MINUTE = 60_000;
@@ -112,6 +113,28 @@ export function saveSeen(storage, ids, at) {
     storage?.setItem(SEEN_KEY, JSON.stringify({ ids, at: at.toISOString() }));
   } catch {
     // Private mode or full storage: markers just won't carry over.
+  }
+}
+
+const THEME_KEY = 'firsthour:theme';
+
+/** @param {Pick<Storage, 'getItem'> | undefined} storage @returns {Theme} */
+export function loadTheme(storage) {
+  try {
+    const theme = storage?.getItem(THEME_KEY);
+    return theme === 'light' || theme === 'dark' ? theme : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+
+/** Auto is the absence of a choice, so it clears the key. @param {Pick<Storage, 'setItem' | 'removeItem'> | undefined} storage @param {Theme} theme */
+export function saveTheme(storage, theme) {
+  try {
+    if (theme === 'auto') storage?.removeItem(THEME_KEY);
+    else storage?.setItem(THEME_KEY, theme);
+  } catch {
+    // Private mode or full storage: the choice lasts until reload.
   }
 }
 
