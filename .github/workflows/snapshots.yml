@@ -2,9 +2,10 @@ name: Snapshots
 
 on:
   schedule:
-    - cron: '7 */4 * * *'
+    # Off the busy slots (top of the hour, */4 hours): GitHub skips scheduled runs under load.
+    - cron: '23 2,6,10,14,18,22 * * *'
     # Hourly through the 5th: a thread lands on the first weekday, as late as the 3rd.
-    - cron: '37 * 1-5 * *'
+    - cron: '49 * 1-5 * *'
   # Keep inputs empty: nothing is interpolated into the run.
   workflow_dispatch:
 
