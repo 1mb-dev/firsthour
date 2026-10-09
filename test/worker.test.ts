@@ -30,6 +30,19 @@ describe('worker', () => {
     expect(res.headers.get('content-security-policy')).toContain("font-src 'self'");
   });
 
+  it("gives each HTML response its own nonce and lets Cloudflare's injected scripts run, nothing else", async () => {
+    const page = async () => (await worker.fetch(new Request('https://firsthour.1mb.dev/') as never, env, ctx)).headers.get('content-security-policy') ?? '';
+    const [a, b] = [await page(), await page()];
+    const nonce = (policy: string) => policy.match(/'nonce-([A-Za-z0-9+/=]{24})'/)?.[1];
+    expect(nonce(a)).toBeDefined();
+    expect(nonce(a)).not.toBe(nonce(b));
+    expect(a).toContain('https://static.cloudflareinsights.com/beacon.min.js https://static.cloudflareinsights.com/beacon.min.js/;');
+    expect(a).not.toContain('unsafe-inline');
+    // JSON and other non-HTML responses keep the strict policy.
+    const health = await worker.fetch(new Request('https://firsthour.1mb.dev/health') as never, env, ctx);
+    expect(health.headers.get('content-security-policy')).toBe(SECURITY_HEADERS['content-security-policy']);
+  });
+
   const body: PostsBody = { generated: '2026-10-07T16:00:00Z', stale: false, sources: [], next_thread: '2026-11-02T16:00:00Z', items: [] };
 
   it('serves /api/posts as uncached JSON with security headers', async () => {
