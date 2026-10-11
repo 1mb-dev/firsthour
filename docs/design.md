@@ -48,7 +48,7 @@ mobile    age │ company                                               │ sour
 
 Age leads, in mono with tabular figures: `12m`, `3h`, `2d`. Company and role come from the title's `Company | Role | …` convention (`parts` in `public/lib.js`); URLs are dropped from display because the link is built from a validated id, and HN job stories have no company part. The source is one word: `HN`, `HN jobs`, `board`. The filter matches company and role only.
 
-Rows wrap; they never truncate. In HN titles the restriction ("US only", "visa possible") usually comes last, which is what an ellipsis would hide. Titles are capped at 160 characters upstream. Touch screens get rows of at least 44 px; mouse rows stay dense.
+A row opens its posting in a new tab, so the list keeps its ticks, scroll and filter while you read; no icon or note says so. Rows wrap; they never truncate. In HN titles the restriction ("US only", "visa possible") usually comes last, which is what an ellipsis would hide. Titles are capped at 160 characters upstream. Touch screens get rows of at least 44 px; mouse rows stay dense.
 
 ## New and read
 

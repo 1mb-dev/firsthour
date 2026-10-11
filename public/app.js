@@ -42,14 +42,18 @@ const onScreen = new IntersectionObserver(
 
 /**
  * @param {string} tag
- * @param {{ class?: string, text?: string, href?: string }} [props]
+ * @param {{ class?: string, text?: string, href?: string, target?: string, rel?: string }} [props]
  * @param {(Node | null)[]} [children]
  */
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
   if (props.class) node.className = props.class;
   if (props.text !== undefined) node.textContent = props.text;
-  if (props.href !== undefined && node instanceof HTMLAnchorElement) node.href = props.href;
+  if (node instanceof HTMLAnchorElement) {
+    if (props.href !== undefined) node.href = props.href;
+    if (props.target !== undefined) node.target = props.target;
+    if (props.rel !== undefined) node.rel = props.rel;
+  }
   for (const child of children) if (child) node.append(child);
   return node;
 }
@@ -125,7 +129,7 @@ function render() {
 function row(item, now) {
   const fresh = isNew(item, seen);
   const { company, role } = parts(item);
-  const a = el('a', { class: ['row', fresh ? 'new' : '', isRead(item, seen) ? 'read' : ''].filter(Boolean).join(' '), href: item.url }, [
+  const a = el('a', { class: ['row', fresh ? 'new' : '', isRead(item, seen) ? 'read' : ''].filter(Boolean).join(' '), href: item.url, target: '_blank', rel: 'noopener' }, [
     el('span', { class: 'age' }, [el('span', { text: age(item.posted_at, now) }), fresh ? el('span', { class: 'mark', text: 'new' }) : null]),
     el('span', { class: 'co', text: company }),
     el('span', { class: 'role', text: role }),
