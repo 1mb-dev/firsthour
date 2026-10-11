@@ -2,7 +2,7 @@ import { parseSnapshot, SNAPSHOT_KEY } from '../boards/snapshot.ts';
 import { SourceError, type Adapter } from '../types.ts';
 
 const HOUR = 60 * 60 * 1000;
-/** One missed 4-hourly run plus scheduler delay. */
+/** Scheduled snapshots (snapshots.yml) must land more often than this, GitHub's skips and delays included. */
 export const STALE_AFTER_MS = 9 * HOUR;
 export const DROP_AFTER_MS = 24 * HOUR;
 
