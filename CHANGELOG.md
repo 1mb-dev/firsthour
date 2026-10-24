@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Changed
+
+- CI also runs on main daily and on manual dispatch, and tests Node 22 and 24
+
 ## [0.1.0] - 2026-10-11
 
 First release, live at https://firsthour.1mb.dev.
